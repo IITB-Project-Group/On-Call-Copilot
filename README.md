@@ -10,7 +10,7 @@ The on-call engineer for an online store. The engineer watches the investigation
 
 ## System under operation
 
-The target system is the [OpenTelemetry Astronomy Shop](https://github.com/open-telemetry/opentelemetry-demo) demo: a multi-language store with Prometheus, Jaeger, OpenSearch, Grafana, and a load generator. It runs with Docker Compose and needs about 6 GB of RAM (about 3 GB in minimal mode) and 14 GB of disk.
+The target system is the [OpenTelemetry Astronomy Shop](https://github.com/open-telemetry/opentelemetry-demo) demo: a multi-language store with Prometheus, Jaeger, OpenSearch, Grafana, and a load generator. This repo runs it on a local [kind](https://kind.sigs.k8s.io/) cluster. The shop needs about 6 GB of RAM and 14 GB of disk.
 
 Its flag service (`flagd`) injects failures through feature flags:
 
@@ -26,6 +26,32 @@ Its flag service (`flagd`) injects failures through feature flags:
 | `imageSlowLoad` | Slow image loads |
 
 If a laptop cannot run the demo, the fallback is a four-service FastAPI shop with faults injected through [Toxiproxy](https://github.com/shopify/toxiproxy).
+
+## Run the shop
+
+Prerequisites: Docker or Podman, [kind](https://kind.sigs.k8s.io/), Helm 3.14 or newer, and kubectl. The container runtime needs about 6 GB of free RAM.
+
+```shell
+./up.sh
+```
+
+`up.sh` creates a kind cluster named `otel-demo`, installs the [OpenTelemetry Demo Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-demo) into the `otel-demo` namespace, and publishes the frontend proxy on port 8080. Run it again to reuse an existing cluster and release. The first run pulls images and can take several minutes.
+
+On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports no CPU share support. kind then stops and asks for the systemd property `Delegate=yes`. `up.sh` detects that and switches to kind's Podman provider, which reads the cgroup controllers from `podman info`.
+
+| Surface | URL |
+| --- | --- |
+| Web store | http://localhost:8080/ |
+| Grafana | http://localhost:8080/grafana/ |
+| Jaeger | http://localhost:8080/jaeger/ui/ |
+| Feature flags | http://localhost:8080/feature |
+| Load generator | http://localhost:8080/loadgen/ |
+
+Remove the cluster with:
+
+```shell
+kind delete cluster --name otel-demo
+```
 
 ## One incident, start to finish
 
@@ -81,7 +107,7 @@ flowchart TD
 ### Planned repository layout
 
 ```text
-deploy/        Shop runtime, alert rules, Docker Compose
+up.sh          Kind cluster and Astronomy Shop Helm install
 knowledge/     Runbooks, seed postmortems, ingestion
 tools/         Telemetry, runbook search, tickets, ops actions
 graph/         Incident commander and incident state
@@ -126,7 +152,7 @@ Six owners, with the orchestration owner as integration lead.
 
 | Owner | Scope |
 | --- | --- |
-| Platform | Shop runtime, Compose, Prometheus, Alertmanager, Grafana |
+| Platform | Shop runtime (`up.sh`, kind), Prometheus, Alertmanager, Grafana |
 | Knowledge | Runbooks, seed postmortems, ingestion, search |
 | Tools and safety | Telemetry tools, tickets, allow-listed ops actions, redaction, injection tests, budgets |
 | Orchestration | Incident commander, hypothesis state, verify, rollback, replan |
@@ -150,4 +176,4 @@ First integrated milestone: `paymentFailure` only, from alert to approved flag c
 
 ## Status
 
-The repository is the project home. Implementation has not started. The sections above are the build contract taken from the capstone architecture guide.
+The Astronomy Shop is running from `up.sh` on a local kind cluster. The incident copilot, runbooks, agents, and evaluation harness are still to be built. The sections above are the build contract taken from the capstone architecture guide.
