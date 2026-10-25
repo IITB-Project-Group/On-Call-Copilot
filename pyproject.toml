@@ -1,0 +1,20 @@
+[project]
+name = "on-call-copilot"
+version = "0.1.0"
+description = "On-call copilot for the OpenTelemetry Astronomy Shop."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn==0.34.0",
+  "prometheus-client==0.21.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "pytest==8.3.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "incident_api"]
+testpaths = ["tests", "incident_api/tests"]

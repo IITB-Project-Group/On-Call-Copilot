@@ -1,0 +1,40 @@
+components:
+  frontend-proxy:
+    service:
+      type: NodePort
+      nodePort: 30080
+prometheus:
+  alertmanager:
+    enabled: true
+    persistence:
+      enabled: false
+    config:
+      route:
+        receiver: incident-api
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
+      receivers:
+        - name: incident-api
+          webhook_configs:
+            - url: http://incident-api.otel-demo.svc:8000/webhooks/alert
+              send_resolved: false
+  serverFiles:
+    alerting_rules.yml:
+      groups:
+        - name: checkout
+          rules:
+            - alert: CheckoutErrorRateHigh
+              expr: |
+                (
+                  sum(rate(traces_span_metrics_calls_total{service_name="checkout",span_name="oteldemo.CheckoutService/PlaceOrder",status_code="STATUS_CODE_ERROR"}[5m]))
+                  /
+                  sum(rate(traces_span_metrics_calls_total{service_name="checkout",span_name="oteldemo.CheckoutService/PlaceOrder"}[5m]))
+                ) > 0.05
+              for: 5m
+              labels:
+                service: checkout
+                severity: page
+              annotations:
+                summary: Checkout PlaceOrder error rate is above 5% for 5 minutes.
+                expr: sum(rate(traces_span_metrics_calls_total{service_name="checkout",span_name="oteldemo.CheckoutService/PlaceOrder",status_code="STATUS_CODE_ERROR"}[5m])) / sum(rate(traces_span_metrics_calls_total{service_name="checkout",span_name="oteldemo.CheckoutService/PlaceOrder"}[5m]))

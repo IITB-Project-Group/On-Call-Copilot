@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incident-api
+  namespace: otel-demo
+  labels:
+    app: incident-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incident-api
+  template:
+    metadata:
+      labels:
+        app: incident-api
+    spec:
+      containers:
+        - name: incident-api
+          image: oncall-incident-api:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: INCIDENT_DB
+              value: /data/incidents.sqlite3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incident-api
+  namespace: otel-demo
+  labels:
+    app: incident-api
+spec:
+  type: ClusterIP
+  selector:
+    app: incident-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -46,11 +46,18 @@ On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports
 | Jaeger | http://localhost:8080/jaeger/ui/ |
 | Feature flags | http://localhost:8080/feature |
 | Load generator | http://localhost:8080/loadgen/ |
+| Incident console | http://localhost:8000/ |
 
-Remove the cluster with:
+`up.sh` also starts the incident API. Prometheus raises `CheckoutErrorRateHigh` when the checkout `PlaceOrder` error rate stays above 5% for five minutes, and Alertmanager posts that alert to the API. The console streams the incident and records approve, edit, or reject. An edit clears an earlier approval. The console does not change the shop.
+
+To fire the rule, set `paymentFailure` to `100%` at the feature-flag page and leave the load generator running. The incident shows on the console after the five-minute window. Refresh the console if it was already open; the list loads when the page opens.
+
+The shop home page does not change when the flag is on. Payment failures show in Grafana on the Demo Dashboard: set the service to `payment`, set the time range to the last 15 minutes, and open Log Records. The default service on that dashboard is `frontend`.
+
+Stop the incident port-forward and delete the cluster with:
 
 ```shell
-kind delete cluster --name otel-demo
+./down.sh
 ```
 
 ## One incident, start to finish
@@ -107,17 +114,20 @@ flowchart TD
 ### Planned repository layout
 
 ```text
-up.sh          Kind cluster and Astronomy Shop Helm install
+up.sh          Kind cluster, Astronomy Shop, and the incident API
+deploy/        Shop Helm values and the incident API manifest
+schemas/       Alert, incident state, tool result, action proposal, eval case
+incident_api/  Process that serves the webhook, stream, decisions, and page
+api/           Alert webhook parsing and the investigation stream
+ui/            Live investigation and approval page
 knowledge/     Runbooks, seed postmortems, ingestion
 tools/         Telemetry, runbook search, tickets, ops actions
 graph/         Incident commander and incident state
 agents/        Triage, diagnosis, runbook, comms, remediation, memory
-api/           Alert webhook and investigation stream
-ui/            Live investigation and approval
 eval/          Fault suite, scorer, ablations, CI gate
 ```
 
-Shared schemas (alert payload, incident state, tool results, action proposal, eval case) live in one module and change only by review. Agents call tools through those schemas. Diagnosis agents receive no write tools.
+`schemas/` is the shared module. It changes only by review. Agents call tools through those types. Diagnosis agents receive no write tools.
 
 ## Signature challenges
 
@@ -176,4 +186,4 @@ First integrated milestone: `paymentFailure` only, from alert to approved flag c
 
 ## Status
 
-The Astronomy Shop is running from `up.sh` on a local kind cluster. The incident copilot, runbooks, agents, and evaluation harness are still to be built. The sections above are the build contract taken from the capstone architecture guide.
+The Astronomy Shop and the incident alert path run from `up.sh` on a local kind cluster. Runbooks, agents, and the evaluation harness are still to be built. The sections above are the build contract taken from the capstone architecture guide.
