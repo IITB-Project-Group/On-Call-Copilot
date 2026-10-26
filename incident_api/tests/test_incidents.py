@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.stream import snapshot_event
-from incident_api.app import create_app
+from incident_api.app import create_app, default_db_path
+from incident_api.store import IncidentStore
 from tools.actions import FlagWriteError
 
 
@@ -196,3 +199,76 @@ def test_approve_changes_the_payment_flag_only_for_checkout_or_payment(tmp_path)
     assert approved.json()["decision"] == "approve"
     assert "flag_result" not in approved.json()
     assert calls == []
+
+
+def test_health_and_missing_incident(tmp_path):
+    api = client(tmp_path)
+    assert api.get("/healthz").json() == {"status": "ok"}
+    assert api.get("/incidents/missing").status_code == 404
+    missing = api.post(
+        "/incidents/missing/decision",
+        json={"decision": "reject", "text": ""},
+    )
+    assert missing.status_code == 404
+    unknown = api.post(
+        "/incidents/missing/decision",
+        json={"decision": "close", "text": "no"},
+    )
+    assert unknown.status_code == 400
+
+
+def test_blank_edit_is_rejected_and_blank_approval_keeps_the_note(tmp_path):
+    api = client(tmp_path)
+    incident = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]
+    blank = api.post(
+        f"/incidents/{incident['id']}/decision",
+        json={"decision": "edit", "text": "   "},
+    )
+    assert blank.status_code == 400
+    assert api.get(f"/incidents/{incident['id']}").json()["decision"] is None
+
+    approved = api.post(
+        f"/incidents/{incident['id']}/decision",
+        json={"decision": "approve", "text": ""},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["approved_text"] == incident["command_text"]
+
+
+def test_missing_incident_stream_ends(tmp_path):
+    api = client(tmp_path)
+    with api.stream("GET", "/incidents/missing/stream") as response:
+        assert response.status_code == 200
+        body = "".join(response.iter_text())
+    assert body == snapshot_event(None)
+
+
+def test_default_db_path_uses_the_environment_or_a_temp_file(monkeypatch, tmp_path):
+    configured = tmp_path / "configured.sqlite3"
+    monkeypatch.setenv("INCIDENT_DB", str(configured))
+    assert default_db_path() == str(configured)
+
+    monkeypatch.delenv("INCIDENT_DB")
+
+    def unavailable(self, *args, **kwargs):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(Path, "mkdir", unavailable)
+    assert default_db_path().endswith("oncall-incidents.sqlite3")
+
+
+def test_store_rejects_bad_input(tmp_path):
+    store = IncidentStore(str(tmp_path / "incidents.sqlite3"))
+    created, is_new = store.create(
+        alert_name="ServiceErrorRateHigh",
+        service="checkout",
+        starts_at="2026-10-26T07:00:00Z",
+        expression="",
+        payload="not-json",
+    )
+    assert is_new
+    assert created["command_text"] == "ServiceErrorRateHigh on checkout, started 2026-10-26T07:00:00Z."
+    assert store.get("missing") is None
+    assert store.decide("missing", "reject", "") is None
+    with pytest.raises(ValueError, match="decision must be one of"):
+        store.decide(created["id"], "close", "no")
