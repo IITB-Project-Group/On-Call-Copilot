@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY schemas ./schemas
 COPY api ./api
 COPY ui ./ui
+COPY tools ./tools
 COPY incident_api/incident_api ./incident_api
 
 ENV INCIDENT_DB=/data/incidents.sqlite3

@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from api.alerts import firing_alerts
 from api.stream import snapshot_event
 from incident_api.store import DECISIONS, IncidentStore
+from tools.actions import FlagWriteError, set_payment_failure_off
 from ui.page import PAGE
 
 
@@ -42,7 +43,8 @@ def default_db_path() -> str:
         return str(Path(tempfile.gettempdir()) / "oncall-incidents.sqlite3")
 
 
-def create_app(db_path: str | None = None) -> FastAPI:
+def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
+    change_flag = set_payment_failure_off if on_approve is None else on_approve
     store = IncidentStore(db_path or default_db_path())
     registry = CollectorRegistry()
     incidents_total = Counter(
@@ -88,8 +90,12 @@ def create_app(db_path: str | None = None) -> FastAPI:
         return PAGE
 
     @app.get("/incidents")
-    def list_incidents() -> list[dict]:
-        return store.list_incidents()
+    def list_incidents(state: str | None = None) -> list[dict]:
+        if state is None:
+            return store.list_incidents()
+        if state in {"open", "closed"}:
+            return store.list_incidents(state=state)
+        raise HTTPException(status_code=400, detail="state must be open or closed")
 
     @app.get("/incidents/{incident_id}")
     def get_incident(incident_id: str) -> dict:
@@ -113,12 +119,23 @@ def create_app(db_path: str | None = None) -> FastAPI:
     def decision(incident_id: str, body: DecisionBody) -> dict:
         if body.decision not in DECISIONS:
             raise HTTPException(status_code=400, detail="unknown decision")
+        current = store.get(incident_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="incident not found")
+        flag_result = None
+        if body.decision == "approve" and current["service"] in {"checkout", "payment"}:
+            try:
+                flag_result = change_flag()
+            except FlagWriteError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
         try:
             updated = store.decide(incident_id, body.decision, body.text)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if updated is None:
             raise HTTPException(status_code=404, detail="incident not found")
+        if flag_result is not None:
+            updated = {**updated, "flag_result": flag_result}
         return updated
 
     @app.get("/incidents/{incident_id}/stream")

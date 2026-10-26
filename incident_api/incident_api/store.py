@@ -47,10 +47,11 @@ class IncidentStore:
                 )
                 """
             )
+            connection.execute("DROP INDEX IF EXISTS incidents_alert_start")
             connection.execute(
                 """
-                CREATE UNIQUE INDEX IF NOT EXISTS incidents_alert_start
-                ON incidents(alert_name, starts_at)
+                CREATE UNIQUE INDEX IF NOT EXISTS incidents_alert_service_start
+                ON incidents(alert_name, service, starts_at)
                 """
             )
 
@@ -90,9 +91,9 @@ class IncidentStore:
                 row = connection.execute(
                     """
                     SELECT * FROM incidents
-                    WHERE alert_name = ? AND starts_at = ?
+                    WHERE alert_name = ? AND service = ? AND starts_at = ?
                     """,
-                    (alert_name, starts_at),
+                    (alert_name, service, starts_at),
                 ).fetchone()
                 return _row_to_dict(row), False
         created = self.get(incident_id)
@@ -109,11 +110,15 @@ class IncidentStore:
             return None
         return _row_to_dict(row)
 
-    def list_incidents(self) -> list[dict]:
+    def list_incidents(self, *, state: str | None = None) -> list[dict]:
+        query = "SELECT * FROM incidents"
+        if state == "open":
+            query += " WHERE decision IS NULL OR decision = 'edit'"
+        elif state == "closed":
+            query += " WHERE decision IN ('approve', 'reject')"
+        query += " ORDER BY starts_at DESC"
         with self._lock, self._connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM incidents ORDER BY starts_at DESC"
-            ).fetchall()
+            rows = connection.execute(query).fetchall()
         return [_row_to_dict(row) for row in rows]
 
     def decide(self, incident_id: str, decision: str, text: str) -> dict | None:

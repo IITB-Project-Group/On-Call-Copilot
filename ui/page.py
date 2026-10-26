@@ -47,7 +47,17 @@ PAGE = """<!DOCTYPE html>
       letter-spacing: -0.02em;
       margin: 0.35rem 0 0.8rem;
     }
-    .desk { margin: 0 0 1rem; color: var(--muted); }
+    .desk { margin: 0 0 0.8rem; color: var(--muted); }
+    .views { display: flex; gap: 0.4rem; margin: 0 0 1rem; }
+    .views button {
+      font: inherit;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+    }
+    .views button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
     #list { list-style: none; margin: 0; padding: 0; }
     #list button {
       display: block;
@@ -84,6 +94,7 @@ PAGE = """<!DOCTYPE html>
       resize: vertical;
     }
     .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+    .actions[hidden] { display: none; }
     .actions button {
       font: inherit;
       background: var(--ink);
@@ -115,23 +126,27 @@ PAGE = """<!DOCTYPE html>
   <main>
     <aside>
       <p class="desk">On-call</p>
+      <div class="views">
+        <button id="show-open" type="button" aria-pressed="true">Open</button>
+        <button id="show-closed" type="button" aria-pressed="false">Closed</button>
+      </div>
       <ul id="list"></ul>
     </aside>
     <section>
       <p id="state" class="meta">No incidents yet.</p>
       <h1 id="title">Waiting for a checkout alert</h1>
-      <p id="lead">The shop keeps running. This page only records what you decide.</p>
+      <p id="lead">Approve closes the incident. A checkout or payment incident also sets paymentFailure to off.</p>
       <form id="decision">
         <label for="command">Note</label>
         <textarea id="command"></textarea>
         <div class="actions">
-          <button id="approve" type="button">Approve note</button>
+          <button id="approve" type="button">Approve</button>
           <button id="edit" class="quiet" type="button">Save edit</button>
           <button id="reject" class="quiet" type="button">Reject</button>
         </div>
       </form>
       <p id="message" class="hint"></p>
-      <p class="hint">Approve records this note. Save edit replaces it and clears an earlier approval. Reject records a no. None of these change the shop.</p>
+      <p class="hint">Approve closes the incident. A checkout or payment incident also sets paymentFailure to off. Save edit keeps it open and clears an earlier approval. Reject closes the incident and leaves the shop unchanged.</p>
       <details>
         <summary>Query Prometheus used</summary>
         <pre id="expression"></pre>
@@ -147,9 +162,11 @@ PAGE = """<!DOCTYPE html>
     const expression = document.querySelector("#expression");
     const message = document.querySelector("#message");
     const form = document.querySelector("#decision");
+    const actions = document.querySelector(".actions");
     let current = null;
     let source = null;
     let incidents = [];
+    let view = "open";
 
     function payloadOf(incident) {
       try { return JSON.parse(incident.payload); }
@@ -182,6 +199,10 @@ PAGE = """<!DOCTYPE html>
       return "Waiting";
     }
 
+    function isOpen(incident) {
+      return incident.decision !== "approve" && incident.decision !== "reject";
+    }
+
     function generatedNote(incident) {
       return incident.command_text.includes("Expression:");
     }
@@ -201,22 +222,34 @@ PAGE = """<!DOCTYPE html>
       lead.textContent = firing ? decision + ". The alert is still firing." : decision + ".";
       if (document.activeElement !== command) command.value = noteFor(incident);
       expression.textContent = incident.expression || "No query was stored with this alert.";
+      const closed = !isOpen(incident);
+      command.readOnly = closed;
+      actions.hidden = closed;
       form.hidden = false;
+      if (closed) lead.textContent = decision + ". The flag change is not run again from this view.";
     }
 
     function showEmpty() {
-      title.textContent = "Waiting for a checkout alert";
-      state.textContent = "No incidents yet.";
+      const closedView = view === "closed";
+      title.textContent = closedView ? "No closed incidents" : "No open incidents";
+      state.textContent = closedView
+        ? "Approved and rejected incidents show up here."
+        : "Approved and rejected incidents stay on Closed.";
       state.className = "meta";
-      lead.textContent = "Set paymentFailure to 100% and leave the load generator running. This page updates after the error rate stays high for five minutes.";
+      lead.textContent = closedView
+        ? "Choose Open to see incidents that are still waiting."
+        : "A new checkout alert will show up here.";
       command.value = "";
+      command.readOnly = false;
+      actions.hidden = false;
       expression.textContent = "";
       form.hidden = true;
     }
 
     function renderList() {
       list.replaceChildren();
-      for (const incident of incidents) {
+      const shown = incidents.filter(view === "open" ? isOpen : (incident) => !isOpen(incident));
+      for (const incident of shown) {
         const item = document.createElement("li");
         const button = document.createElement("button");
         button.type = "button";
@@ -231,16 +264,31 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
+    function shownIncidents() {
+      return incidents.filter(view === "open" ? isOpen : (incident) => !isOpen(incident));
+    }
+
     async function loadList() {
-      const response = await fetch("/incidents");
+      const response = await fetch("/incidents?state=" + view);
       incidents = await response.json();
-      if (!current && incidents.length) watch(incidents[0].id);
-      if (current && !incidents.some((incident) => incident.id === current)) {
+      const shown = shownIncidents();
+      if (current && !shown.some((incident) => incident.id === current)) {
         current = null;
         if (source) source.close();
       }
+      if (!current && shown.length) watch(shown[0].id);
       renderList();
-      if (!incidents.length) showEmpty();
+      if (!shown.length) showEmpty();
+    }
+
+    function setView(next) {
+      view = next;
+      document.querySelector("#show-open").setAttribute("aria-pressed", String(view === "open"));
+      document.querySelector("#show-closed").setAttribute("aria-pressed", String(view === "closed"));
+      current = null;
+      if (source) source.close();
+      message.textContent = "";
+      loadList();
     }
 
     function watch(id) {
@@ -264,13 +312,23 @@ PAGE = """<!DOCTYPE html>
         message.textContent = await response.text();
         return;
       }
-      show(await response.json());
-      if (decision === "approve") message.textContent = "Approved. That note is the recorded text.";
-      if (decision === "edit") message.textContent = "Saved. The earlier approval was cleared.";
-      if (decision === "reject") message.textContent = "Rejected. No note is approved.";
+      const body = await response.json();
+      if (decision === "approve" || decision === "reject") {
+        current = null;
+        if (source) source.close();
+        await loadList();
+        message.textContent = decision === "approve"
+          ? (body.flag_result ? "Closed. " + body.flag_result + "." : "Closed.")
+          : "Closed. The flag was left unchanged.";
+        return;
+      }
+      show(body);
+      message.textContent = "Saved. The earlier approval was cleared.";
       loadList();
     }
 
+    document.querySelector("#show-open").addEventListener("click", () => setView("open"));
+    document.querySelector("#show-closed").addEventListener("click", () => setView("closed"));
     document.querySelector("#approve").addEventListener("click", () => send("approve"));
     document.querySelector("#edit").addEventListener("click", () => send("edit"));
     document.querySelector("#reject").addEventListener("click", () => send("reject"));

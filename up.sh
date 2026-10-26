@@ -246,7 +246,7 @@ echo "  Feature flags     http://localhost:${HOST_PORT}/feature"
 echo "  Load generator    http://localhost:${HOST_PORT}/loadgen/"
 echo "  Incident console  http://localhost:${INCIDENT_PORT}/"
 echo
-echo "Set paymentFailure to 100% on the feature-flag page. CheckoutErrorRateHigh fires after 5 minutes."
+echo "A service whose error rate stays above 5% for 1 minute opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
 echo
 echo "Pods:"
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get pods
