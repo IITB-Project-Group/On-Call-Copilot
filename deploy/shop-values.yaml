@@ -29,18 +29,18 @@ prometheus:
               expr: |
                 (
                   max by (service_name) (
-                    sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[1m]))
+                    sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[2m]))
                     /
-                    sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[1m]))
+                    sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[2m]))
                   ) > 0.05
                 )
                 and
                 (
-                  sum by (service_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[1m])) > 0.01
+                  sum by (service_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[2m])) > 0.01
                 )
               for: 1m
               labels:
                 severity: page
               annotations:
-                summary: "{{ $labels.service_name }} has a request failing more than 5% of the time for 1 minute."
-                expr: max by (service_name) (sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[1m])) / sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[1m])))
+                summary: "{{ $labels.service_name }} has a request failing more than 5% of the time over 2 minutes."
+                expr: max by (service_name) (sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[2m])) / sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[2m])))

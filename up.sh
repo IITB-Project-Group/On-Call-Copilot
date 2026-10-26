@@ -246,7 +246,7 @@ echo "  Feature flags     http://localhost:${HOST_PORT}/feature"
 echo "  Load generator    http://localhost:${HOST_PORT}/loadgen/"
 echo "  Incident console  http://localhost:${INCIDENT_PORT}/"
 echo
-echo "A service whose error rate stays above 5% for 1 minute opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "A service whose error rate stays above 5% over 2 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
 echo
 echo "Pods:"
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get pods

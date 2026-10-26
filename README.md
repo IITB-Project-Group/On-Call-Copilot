@@ -48,9 +48,9 @@ On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports
 | Load generator | http://localhost:8080/loadgen/ |
 | Incident console | http://localhost:8000/ |
 
-`up.sh` also starts the incident API. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time for one minute, and Alertmanager posts each firing service to the API. The console lists open incidents and keeps approved and rejected ones on Closed. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
+`up.sh` also starts the incident API. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time over two minutes and that stays true for one minute. Alertmanager posts each firing service to the API. The console lists open incidents and keeps approved and rejected ones on Closed. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
 
-To fire the rule, set `paymentFailure` to `100%`, or turn on another flag that makes a service return errors, such as `aiRunawayAgent`. Leave the load generator running. One incident per service shows on the console after about a minute. Refresh the console if it was already open; the list loads when the page opens.
+To fire the rule, set `paymentFailure` to `100%`, or turn on another flag that makes a service return errors, such as `aiRunawayAgent`. Leave the load generator running. Prometheus scrapes once a minute, so the rule reads the last two minutes and then waits one minute. One incident per service shows on the console after that. Refresh the console if it was already open; the list loads when the page opens.
 
 The shop home page does not change when the flag is on. Payment failures show in Grafana on the Demo Dashboard: set the service to `payment`, set the time range to the last 15 minutes, and open Log Records. The default service on that dashboard is `frontend`.
 
@@ -62,7 +62,7 @@ Stop the incident port-forward and delete the cluster with:
 
 ## One incident, start to finish
 
-An alert reports that a service error rate has stayed above 5% for one minute.
+An alert reports that a service error rate has stayed above 5% over the last two minutes.
 
 ```mermaid
 flowchart TD
