@@ -13,6 +13,8 @@ dependencies = [
 dev = [
   "httpx==0.28.1",
   "pytest==8.3.4",
+  "pytest-cov==6.0.0",
+  "coverage==7.17.0",
   "ruff==0.8.4",
 ]
 
@@ -23,3 +25,22 @@ testpaths = ["tests", "incident_api/tests"]
 [tool.ruff]
 line-length = 110
 extend-exclude = ["opentelemetry-demo", ".bob"]
+
+[tool.coverage.run]
+branch = true
+source = [
+  "incident_api",
+  "api",
+  "ui",
+  "tools",
+  "schemas",
+  "graph",
+  "agents",
+  "knowledge",
+  "eval",
+]
+omit = ["*/tests/*", "tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 82
