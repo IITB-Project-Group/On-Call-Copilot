@@ -243,6 +243,54 @@ def test_missing_incident_stream_ends(tmp_path):
     assert body == snapshot_event(None)
 
 
+def test_stream_keeps_watching_until_the_incident_disappears(tmp_path, monkeypatch):
+    api = client(tmp_path)
+    incident = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]
+    store = api.app.state.store
+    real_get = store.get
+    seen = {"n": 0}
+
+    def get(incident_id):
+        seen["n"] += 1
+        if seen["n"] > 2:
+            return None
+        return real_get(incident_id)
+
+    store.get = get
+
+    async def no_wait(_seconds):
+        return None
+
+    monkeypatch.setattr("incident_api.app.asyncio.sleep", no_wait)
+    with api.stream("GET", f"/incidents/{incident['id']}/stream") as response:
+        body = "".join(response.iter_text())
+    assert body.startswith("data: ")
+    assert body.endswith(snapshot_event(None))
+    assert seen["n"] == 3
+
+
+def test_decision_is_not_found_when_the_incident_disappears(tmp_path):
+    api = client(tmp_path)
+    incident = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]
+    store = api.app.state.store
+    real_get = store.get
+    seen = {"n": 0}
+
+    def get(incident_id):
+        seen["n"] += 1
+        if seen["n"] == 1:
+            return real_get(incident_id)
+        return None
+
+    store.get = get
+    response = api.post(
+        f"/incidents/{incident['id']}/decision",
+        json={"decision": "reject", "text": ""},
+    )
+    assert response.status_code == 404
+    assert seen["n"] == 2
+
+
 def test_default_db_path_uses_the_environment_or_a_temp_file(monkeypatch, tmp_path):
     configured = tmp_path / "configured.sqlite3"
     monkeypatch.setenv("INCIDENT_DB", str(configured))
@@ -255,6 +303,9 @@ def test_default_db_path_uses_the_environment_or_a_temp_file(monkeypatch, tmp_pa
 
     monkeypatch.setattr(Path, "mkdir", unavailable)
     assert default_db_path().endswith("oncall-incidents.sqlite3")
+
+    monkeypatch.setattr(Path, "mkdir", lambda *args, **kwargs: None)
+    assert default_db_path() == "/data/incidents.sqlite3"
 
 
 def test_store_rejects_bad_input(tmp_path):
