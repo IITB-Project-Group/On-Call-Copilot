@@ -402,10 +402,14 @@ incident = save_incident(
 ### Search incidents
 
 ```python
-from knowledge.memory import search_incidents
+from knowledge.memory import IncidentMatch, search_incidents
 
-for match in search_incidents("payment failure during checkout", top_k=3):
-    print(match.score, match.incident.lesson)
+
+def find_similar_incidents(query: str, top_k: int = 5) -> list[IncidentMatch]:
+    return search_incidents(query, top_k=top_k)
+
+
+matches = find_similar_incidents("checkout failing due to payment errors")
 ```
 
 ### Storage and configuration
