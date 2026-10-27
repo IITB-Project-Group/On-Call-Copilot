@@ -1,18 +1,19 @@
 # On-Call Copilot
 
-On-Call Copilot is a knowledge and memory foundation for incident response. It
-organizes operational runbooks and past incidents, retrieves passage-level
-evidence, and defines guardrails for safely reusing lessons. The current
-implementation covers the knowledge and retrieval foundation; it is not yet a
-complete autonomous incident-response agent.
+On-Call Copilot's knowledge component retrieves evidence from operational
+runbooks and past incident reports to support incident response. It includes a
+completed RAG pipeline and a simple incident-memory layer that saves reviewed
+incidents to SQLite and supports semantic search.
 
 ## Current Status
 
 The repository currently contains 15 runbooks and 10 postmortems. They are
 ingested, chunked into 140 passage records, and indexed in the persistent local
-Chroma collection. The corpus index was built with OpenRouter `baai/bge-m3` and
-verified by reopening the collection in a separate process. The embedding API
-key is kept in the local root `.env`, which is excluded from source control.
+Chroma collection. The completed RAG pipeline includes hybrid BM25 and
+semantic retrieval, query rewriting, reranking, and the runbooks-kb tool. The
+corpus index was built with OpenRouter `baai/bge-m3` and verified by reopening
+the collection in a separate process. The embedding API key is kept in the
+local root `.env`, which is excluded from source control.
 
 ## Completed Components
 
@@ -22,21 +23,9 @@ key is kept in the local root `.env`, which is excluded from source control.
   failure scenarios such as payment failures, authentication refresh, Kafka
   backlogs, inventory sync, and recommendation degradation.
 - `knowledge/postmortems/` contains 10 seed incidents, including a deliberately
-  misleading lesson case for exercising memory safeguards.
+  misleading example for testing evidence-based retrieval.
 - Markdown front matter carries fields such as IDs, service, failure family,
   title, and source date.
-
-### Memory schema and safety policy
-
-- `knowledge/memory/incident_memory_schema.yaml` defines incident, lesson, and
-  retrieval-result structures.
-- `knowledge/memory/memory-policy.md` requires evidence-backed preconditions
-  before a lesson is considered applicable. Service or failure-family
-  mismatches and insufficient evidence must lead to rejection rather than
-  automatic reuse.
-- `knowledge/retrieval/contracts.py` defines incident retrieval request/result
-  records and a policy check for service, failure-family, and lesson
-  preconditions.
 
 ### Ingestion and passage chunking
 
@@ -101,19 +90,18 @@ key is kept in the local root `.env`, which is excluded from source control.
   `retrieval_config.yaml`; `--split dev|heldout` limits the queries.
 
 **Latest result (2026-10-25, 1 query):** Recall@5 and Hit@5 were 1.000 for both
-`query_rewrite_count` 0 and 2. One query cannot show whether multi-query helps,
-so the default stays at 2 until a larger labeled set is run.
+`query_rewrite_count` 0 and 2. This is a smoke-test result, not a broad
+measurement of retrieval quality.
 
 ## File Guide
 
-This section describes the purpose of the main project files. The `.env` file
-and `.chroma/` database are local runtime data; the README never contains the
-API key or generated vector contents.
+This section describes the purpose of the main project files. The `.env` file,
+`.chroma/` database, and incident SQLite database are local runtime data; the
+README never contains the API key or generated vector contents.
 
 ### Root files and local data
 
-- `README.md` — project overview, status, setup, indexing instructions, and
-  remaining retrieval work.
+- `README.md` — project overview, status, RAG setup, and incident-memory usage.
 - `requirements.txt` — Python runtime dependencies, including `rank-bm25`,
   `python-dotenv`, `chromadb`, and `PyYAML`.
 - `.gitignore` — excludes the local `.env` credentials file and `.chroma/`
@@ -122,24 +110,25 @@ API key or generated vector contents.
   settings. It is ignored by Git and must not be shared or committed.
 - `.chroma/` — generated persistent Chroma database containing embedded
   passages and their source metadata.
+- `knowledge/memory/incidents.sqlite3` — local SQLite database containing
+  saved incident records; excluded from source control.
 
 ### Memory files
 
-- `knowledge/memory/incident_memory_schema.yaml` — field definitions for
-  incidents, reusable lessons, and retrieval results.
-- `knowledge/memory/memory-policy.md` — applicability and retention guardrails;
-  lessons require matching service, failure family, and evidence-backed
-  preconditions.
+- `knowledge/memory/models.py` — incident and semantic search result records.
+- `knowledge/memory/store.py` — SQLite persistence and in-process semantic
+  memory store.
+- `knowledge/memory/incidents.py` — the `save_incident()` and
+  `search_incidents()` functions.
+- `knowledge/memory/__init__.py` — public memory API exports.
 
 ### Retrieval files
 
 - `knowledge/retrieval/__init__.py` — public exports for the retrieval
   contracts, ingestion, chunking, encoder, and Chroma store.
-- `knowledge/retrieval/contracts.py` — request/response data structures and
-  the lesson precondition policy check, plus ranked-passage and complete-runbook
-  response records. `postmortem_ids` identifies retrieved postmortems. The
-  standalone `LessonCandidate` type and policy check are retained for future
-  Memory integration, but are not fields in the RAG response.
+- `knowledge/retrieval/contracts.py` — request/response data structures,
+  ranked-passage records, and complete-runbook response records.
+  `postmortem_ids` identifies retrieved postmortems.
 - `knowledge/retrieval/ingest.py` — reads Markdown documents and extracts
   front matter, source paths, dates, service, and failure-family metadata.
 - `knowledge/retrieval/chunker.py` — splits documents into section-aware
@@ -158,15 +147,14 @@ API key or generated vector contents.
 - `knowledge/retrieval/service.py` — in-process orchestration entry point for
   the `runbooks-kb` tool. It accepts a query-only request, calls
   `search_reranked()`, returns ranked runbook/postmortem passages, and attaches
-  full source text and front matter for matched runbooks. It does not access
-  Memory or apply lessons yet.
+  full source text and front matter for matched runbooks.
 - `knowledge/retrieval/runtime.py` — one-time startup function that loads
   documents/chunks and composes the encoder, Chroma store, hybrid index, and
   retrieval service.
 - `knowledge/retrieval/runbooks_kb_tool.py` — reusable callable adapter for an
   MCP/tool host plus a terminal CLI that prints the response as JSON.
-- `knowledge/evaluation/golden_queries.yaml` — 30-query labeled evaluation
-  dataset with `dev` and `heldout` splits.
+- `knowledge/evaluation/golden_queries.yaml` — labeled evaluation dataset with
+  `dev` and `heldout` splits; currently it contains one `dev` smoke-test query.
 - `knowledge/evaluation/loader.py` — typed dataset loader and corpus-label
   validator for evaluation queries.
 
@@ -223,9 +211,9 @@ and follow-up lessons or evidence conditions.
   resolved through a controlled retry and known-good snapshot restore.
 - `knowledge/postmortems/kafka-backlog-incident.md` — Kafka backlog and
   downstream processing lag caused by a queue failure.
-- `knowledge/postmortems/misleading-lesson-case.md` — guardrail example where
-  an ad CPU lesson appears superficially relevant, but payment evidence points
-  to a different root cause.
+- `knowledge/postmortems/misleading-lesson-case.md` — example where an ad CPU
+  issue appears superficially relevant, but payment evidence points to a
+  different root cause.
 - `knowledge/postmortems/payment-flag-incident.md` — checkout failures traced
   to the active `paymentFailure` flag and payment evidence.
 - `knowledge/postmortems/product-catalog-incident.md` — incomplete catalog
@@ -242,7 +230,7 @@ and follow-up lessons or evidence conditions.
 - `tests/test_ingest_metadata.py` — checks that source and document metadata
   survive ingestion.
 - `tests/test_retrieval_contract.py` — checks retrieval data contracts and
-  acceptance/rejection of lessons under the memory policy.
+  service, failure-family, and evidence compatibility helper behavior.
 - `tests/test_retrieval_service.py` — checks request-to-query construction,
   passage grouping, full-runbook attachment, and separation of postmortem
   context without making API calls.
@@ -250,6 +238,9 @@ and follow-up lessons or evidence conditions.
   query forwarding, blank-query rejection, and JSON output without API calls.
 - `tests/test_evaluation_loader.py` — checks the labeled dataset and rejects
   unknown document IDs, duplicate query IDs, and unsupported query kinds.
+- `tests/test_incident_memory.py` — checks incident save/search through SQLite,
+  reloading into a fresh memory store, empty-database search, and field
+  validation using a fake encoder (no API calls).
 - `tests/test_live_runbook_retrieval.py` — opt-in live test of a supplied query
   through Chroma, RRF, and OpenRouter; skipped unless
   `RUN_LIVE_RETRIEVAL_TESTS=1` is set and requires `LIVE_RETRIEVAL_QUERY`.
@@ -366,6 +357,67 @@ To run one query from PowerShell and print the full `RetrievalResponse` as JSON:
 & .\.venv\Scripts\python.exe -m knowledge.retrieval.runbooks_kb_tool --query "Payment authorization requests are failing."
 ```
 
+## Memory
+
+Memory stores reviewed past incidents and their lessons so they can be found
+later by meaning. It is separate from the runbooks/postmortems RAG pipeline.
+Two functions are exposed from `knowledge.memory`, and neither needs a database
+path or store argument.
+
+### How it works
+
+- `Incident` (`knowledge/memory/models.py`) holds `service`, `symptom`,
+  `root_cause`, `preconditions`, `lesson`, `fix`, `reviewed_by`, and a
+  generated `id`.
+- `save_incident()` validates the fields (none may be empty), embeds the
+  incident, writes it to SQLite, and adds it to the in-process `MemoryStore`.
+  It returns the saved `Incident`.
+- `search_incidents(query, top_k=5)` loads all incidents from SQLite into the
+  `MemoryStore`, embeds the query, and returns up to `top_k` `IncidentMatch`
+  results (`incident` and cosine `score`), best first. It returns an empty list
+  if nothing has been saved.
+- SQLite is the durable source of truth. The `MemoryStore` is an in-process
+  index rebuilt from SQLite on every search, so saved incidents survive
+  restarts.
+
+### Save an incident
+
+```python
+from knowledge.memory import save_incident
+
+incident = save_incident(
+    service="payment",
+    symptom="Checkout error rate exceeded 5% for 8 minutes and payment requests were failing",
+    root_cause="paymentFailure enabled",
+    preconditions=[
+        "Feature flag paymentFailure is enabled",
+        "Payment service traces show errors during failed checkouts",
+    ],
+    lesson="Payment-service errors are usually caused by the paymentFailure feature flag when trace evidence and flag state match.",
+    fix="Disabled paymentFailure flag after approval",
+    reviewed_by="on-call lead",
+)
+```
+
+### Search incidents
+
+```python
+from knowledge.memory import search_incidents
+
+for match in search_incidents("payment failure during checkout", top_k=3):
+    print(match.score, match.incident.lesson)
+```
+
+### Storage and configuration
+
+- Incidents are stored in `knowledge/memory/incidents.sqlite3`, created on the
+  first save. The file is local and excluded from source control.
+- Embeddings use the same OpenRouter encoder as the RAG pipeline, so
+  `EMBEDDING_API_KEY` and `EMBEDDING_MODEL` must be set in `.env`. Incident
+  text is sent to the configured embedding endpoint on every save and search.
+- Because search re-embeds all saved incidents each time, it is intended for a
+  small number of incidents.
+
 ## Tests
 
 Run the test suite from the repository root:
@@ -374,19 +426,10 @@ Run the test suite from the repository root:
 & .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Tests cover retrieval contracts and policy checks, ingestion metadata, passage
-chunking, BM25 and semantic candidate search, OpenRouter configuration and E5
-prefixes, query rewriting, RRF fusion, reranking, Chroma persistence, repeatable
-corpus synchronization, the runbooks-kb tool wrapper, and evaluation dataset
-validation and Recall@5 metrics. The latest full run passed 49 tests, with the opt-in live test
-skipped. Chroma
-currently emits a dependency deprecation warning under Python 3.14; it does not
-fail the tests.
-
-## Remaining Retrieval Work
-
-- Grow the labeled query set beyond the single smoke-test query, then rerun the
-  `--rewrite-counts 0 2` comparison to decide whether multi-query is worth its
-  cost.
-- Connect retrieved lessons to the incident workflow and verify the memory
-  policy is enforced end to end before any lesson is applied.
+Tests cover incident persistence and semantic ranking, retrieval contracts,
+ingestion metadata, passage chunking, BM25 and semantic candidate search,
+OpenRouter configuration and E5 prefixes, query rewriting, RRF fusion,
+reranking, Chroma persistence, repeatable corpus synchronization, the
+runbooks-kb tool wrapper, and evaluation dataset validation and Recall@5
+metrics. Chroma currently emits a dependency deprecation warning under Python
+3.14; it does not fail the tests.
