@@ -119,6 +119,7 @@ def test_set_flag_stops_when_the_variant_never_changes(monkeypatch):
             self._send({"flags": FLAGS})
 
         def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
             if self.path == "/api/write":
                 self._send({})
                 return
