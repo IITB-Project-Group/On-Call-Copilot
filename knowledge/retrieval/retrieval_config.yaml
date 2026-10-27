@@ -1,0 +1,7 @@
+target_words: 350
+overlap_words: 75
+candidate_k: 50
+rrf_k: 60
+query_rewrite_count: 0
+reranker_candidate_k: 20
+top_k: 10

@@ -1,0 +1,10 @@
+# relevant_docs contains front-matter document IDs from runbooks and postmortems.
+# Keep heldout queries separate from dev queries when tuning retrieval.
+queries:
+  - id: q01
+    kind: symptom_only
+    split: dev
+    query: "Customers see declined transactions at checkout and payment traces are full of errors"
+    relevant_docs:
+      - payment-failure
+      - pm-001

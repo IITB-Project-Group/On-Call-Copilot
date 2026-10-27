@@ -1,0 +1,73 @@
+incident:
+  id: string
+  timestamp: datetime
+  alert:
+    source: string
+    rule: string
+    threshold: string
+    duration_minutes: int
+  services_affected:
+    - string
+  symptoms:
+    - string
+  evidence:
+    traces:
+      - string
+    logs:
+      - string
+    metrics:
+      - string
+  hypotheses:
+    - id: string
+      service: string
+      label: string
+      confidence: number
+      evidence: string
+  diagnosis:
+    root_cause_service: string
+    root_cause_family: string
+    confidence: number
+  remediation:
+    action_type: string
+    action_args: map
+    approved_by: string
+    approved_at: datetime
+    rollback_plan: string
+  verification:
+    recovered: bool
+    verification_window_minutes: int
+    evidence: string
+  status_note: string
+  postmortem: string
+
+lesson:
+  id: string
+  incident_id: string
+  title: string
+  summary: string
+  service: string
+  failure_family: string
+  fix: string
+  preconditions:
+    - string
+  applies_when:
+    - string
+  rejected_when:
+    - string
+  source: string
+  frozen: bool
+
+retrieval_result:
+  runbooks:
+    - id: string
+      score: number
+      reason: string
+  similar_incidents:
+    - id: string
+      score: number
+      reason: string
+  lesson_candidates:
+    - id: string
+      score: number
+      precondition_match: bool
+      reason: string
