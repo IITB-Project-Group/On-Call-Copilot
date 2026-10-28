@@ -102,6 +102,11 @@ PAGE = """<!DOCTYPE html>
       border-top: 1px solid var(--line);
     }
     .events time { color: var(--muted); }
+    #issue {
+      margin: 0.85rem 0 0;
+      font-size: 1.15rem;
+      line-height: 1.4;
+    }
     .kicker { margin: 1.35rem 0 0.4rem; font-weight: 600; }
     pre {
       white-space: pre-wrap;
@@ -174,15 +179,17 @@ PAGE = """<!DOCTYPE html>
       <p id="state" class="meta">Approved and rejected incidents stay on Closed.</p>
       <h1 id="title">No open incidents</h1>
       <div id="stream" hidden>
-        <h2>Investigation</h2>
+        <h2>Issue</h2>
+        <p id="issue"></p>
+        <p class="kicker">What was checked</p>
         <ol id="events" class="events"></ol>
-        <p class="kicker">Expression</p>
+        <p class="kicker">Query checked</p>
         <pre id="expression"></pre>
       </div>
     </section>
-    <aside id="decision" class="decision" aria-label="Decision" hidden>
+    <aside id="decision" class="decision" aria-label="Possible solution" hidden>
       <div class="command">
-        <h2>Command</h2>
+        <h2>Possible solution</h2>
         <p id="lead"></p>
         <div id="payload" class="payload" hidden></div>
         <p id="effect" class="effect" hidden></p>
@@ -207,6 +214,7 @@ PAGE = """<!DOCTYPE html>
     const state = document.querySelector("#state");
     const lead = document.querySelector("#lead");
     const command = document.querySelector("#command");
+    const issue = document.querySelector("#issue");
     const expression = document.querySelector("#expression");
     const message = document.querySelector("#message");
     const stream = document.querySelector("#stream");
@@ -322,7 +330,7 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderEvents(incident) {
-      const items = [[when(incident.starts_at), "Alert received. " + summaryOf(incident)]];
+      const items = [[when(incident.starts_at), "Alert received."]];
       if (incident.decision === "edit") {
         items.push([when(incident.updated_at), "Note saved. Earlier approval cleared."]);
       } else if (incident.decision === "approve") {
@@ -348,6 +356,7 @@ PAGE = """<!DOCTYPE html>
       stream.hidden = false;
       decision.hidden = false;
       title.textContent = readableName(incident.service);
+      issue.textContent = summaryOf(incident);
       state.textContent = statusLine(incident);
       state.className = "meta " + (
         incident.decision === "approve" ? "approved" :
@@ -375,6 +384,7 @@ PAGE = """<!DOCTYPE html>
       stream.hidden = true;
       decision.hidden = true;
       command.value = "";
+      issue.textContent = "";
       expression.textContent = "";
     }
 
