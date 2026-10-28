@@ -6,3 +6,5 @@ __pycache__/
 htmlcov/
 *.pdf
 opentelemetry-demo/
+.env
+.chroma/

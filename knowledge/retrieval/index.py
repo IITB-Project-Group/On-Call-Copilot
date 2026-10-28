@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -10,6 +11,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Sequence
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
@@ -20,6 +22,10 @@ from .query_rewriter import OpenRouterQueryRewriter, QueryRewriter
 
 _DOTENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 _LOGGER = logging.getLogger(__name__)
+
+
+class OpenRouterError(RuntimeError):
+    """OpenRouter rejected a request or could not be reached."""
 
 
 class EmbeddingEncoder(Protocol):
@@ -40,6 +46,42 @@ def _e5_prefixes(model_name: str) -> tuple[str, str]:
 def _with_prefix(texts: Sequence[str], prefix: str) -> list[str]:
     """Apply a model-specific instruction prefix to a batch of texts."""
     return [f"{prefix}{text}" for text in texts]
+
+
+def _openrouter_error_detail(error: HTTPError) -> str:
+    """Pull a single-line provider message out of an HTTP error body."""
+    raw = error.read().decode("utf-8", errors="replace").strip()
+    message = ""
+    try:
+        parsed = json.loads(raw) if raw else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    if isinstance(parsed, dict):
+        nested = parsed.get("error")
+        if isinstance(nested, dict) and isinstance(nested.get("message"), str):
+            message = nested["message"].strip()
+    if not message:
+        message = " ".join(raw.split())
+    if not message:
+        reason = error.reason
+        message = reason.strip() if isinstance(reason, str) else ""
+    return message[:500] or "the provider returned an empty error"
+
+
+def _call_openrouter(request: Request, timeout: float, *, what: str) -> Any:
+    """Send one OpenRouter request and raise a readable error when it fails."""
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = _openrouter_error_detail(error)
+        raise OpenRouterError(f"{what} failed (HTTP {error.code}): {detail}") from error
+    except URLError as error:
+        raise OpenRouterError(f"{what} failed: {error.reason}") from error
+    except TimeoutError as error:
+        raise OpenRouterError(f"{what} timed out after {timeout:g} seconds") from error
+    except json.JSONDecodeError as error:
+        raise OpenRouterError(f"{what} returned a response that is not JSON") from error
 
 
 class OpenAICompatibleEmbeddingEncoder:
@@ -82,9 +124,11 @@ class OpenAICompatibleEmbeddingEncoder:
             },
             method="POST",
         )
-        with urlopen(request, timeout=self.timeout_seconds) as response:
-            response_body = json.loads(response.read().decode("utf-8"))
-
+        response_body = _call_openrouter(
+            request,
+            self.timeout_seconds,
+            what=f"OpenRouter embeddings request for model {self.model}",
+        )
         data = response_body.get("data")
         if not isinstance(data, list) or len(data) != len(texts):
             raise ValueError("Embedding response must contain one vector per input text")
@@ -104,16 +148,66 @@ class OpenAICompatibleEmbeddingEncoder:
         return self.encode(_with_prefix(texts, self.query_prefix))
 
 
+class HashedTokenEncoder:
+    """Build deterministic local embeddings from token hashes.
+
+    This encoder does not call OpenRouter. It keeps indexing and semantic search
+    available when an API key is limited to chat models and cannot call an
+    embedding model. Rankings still include BM25, which carries most of the
+    match for this runbook corpus.
+    """
+
+    def __init__(self, *, model: str = "local/hashed-tokens", dimensions: int = 256) -> None:
+        """Select the stored model name and the fixed hash dimension."""
+        if dimensions <= 0:
+            raise ValueError("dimensions must be positive")
+        self.model = model
+        self.dimensions = dimensions
+
+    def encode(self, texts: Sequence[str]) -> list[list[float]]:
+        """Return one L2-normalized hashed vector per text."""
+        return [_hash_embedding(text, self.dimensions) for text in texts]
+
+    def encode_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        """Encode passages with the same local hash used for queries."""
+        return self.encode(texts)
+
+    def encode_queries(self, texts: Sequence[str]) -> list[list[float]]:
+        """Encode queries with the same local hash used for passages."""
+        return self.encode(texts)
+
+
+def _hash_embedding(text: str, dimensions: int) -> list[float]:
+    """Hash tokens into a fixed vector so cosine similarity reflects term overlap."""
+    tokens = _tokenize(text)
+    if not tokens:
+        return [1.0, *([0.0] * (dimensions - 1))]
+
+    vector = [0.0] * dimensions
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        bucket = int.from_bytes(digest[:4], "little") % dimensions
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        vector[bucket] += sign
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0.0:
+        vector[0] = 1.0
+        return vector
+    return [value / norm for value in vector]
+
+
 def create_embedding_encoder(
     provider: str | None = None,
     *,
     model_name: str | None = None,
 ) -> EmbeddingEncoder:
-    """Create the only supported OpenRouter embeddings encoder."""
+    """Create an OpenRouter encoder, or a local hashed encoder when requested."""
     load_dotenv(_DOTENV_PATH, override=False)
     selected_provider = (provider or os.environ.get("EMBEDDING_PROVIDER", "openrouter")).lower()
+    if selected_provider == "local":
+        return HashedTokenEncoder(model=model_name or "local/hashed-tokens")
     if selected_provider != "openrouter":
-        raise ValueError("EMBEDDING_PROVIDER must be 'openrouter'")
+        raise ValueError("EMBEDDING_PROVIDER must be 'openrouter' or 'local'")
     selected_model = model_name or os.environ.get("EMBEDDING_MODEL")
     return OpenAICompatibleEmbeddingEncoder(model=selected_model)
 
@@ -195,9 +289,11 @@ class OpenRouterReranker:
             },
             method="POST",
         )
-        with urlopen(request, timeout=self.timeout_seconds) as response:
-            response_body = json.loads(response.read().decode("utf-8"))
-
+        response_body = _call_openrouter(
+            request,
+            self.timeout_seconds,
+            what=f"OpenRouter rerank request for model {self.model}",
+        )
         results = response_body.get("results")
         if not isinstance(results, list):
             raise ValueError("Rerank response must contain a results list")
@@ -652,5 +748,15 @@ class HybridCandidateIndex:
         if not fused_candidates:
             return []
 
-        selected_reranker = reranker or OpenRouterReranker()
-        return selected_reranker.rerank(original_query, fused_candidates, top_n=final_top_k)
+        try:
+            selected_reranker = reranker or OpenRouterReranker()
+            return selected_reranker.rerank(original_query, fused_candidates, top_n=final_top_k)
+        except OpenRouterError as error:
+            _LOGGER.warning(
+                "Reranking failed; returning the fused BM25 and semantic ranking (%s)",
+                type(error).__name__,
+            )
+            return [
+                RetrievalCandidate(candidate.chunk, candidate.score, rank, candidate.channel)
+                for rank, candidate in enumerate(fused_candidates[:final_top_k], start=1)
+            ]

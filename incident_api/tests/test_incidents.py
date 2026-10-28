@@ -201,6 +201,36 @@ def test_approve_changes_the_payment_flag_only_for_checkout_or_payment(tmp_path)
     assert calls == []
 
 
+def test_runbook_search_uses_the_loaded_index(tmp_path):
+    api = client(tmp_path)
+
+    missing = api.get("/runbooks")
+    blank = api.get("/runbooks", params={"q": " "})
+    found = api.get("/runbooks", params={"q": "payment authorization failures"})
+    again = api.get("/runbooks", params={"q": "payment authorization failures"})
+
+    assert missing.status_code == 400
+    assert blank.status_code == 400
+    assert found.status_code == 200
+    assert again.json() == found.json()
+    body = found.json()
+    assert body["query"] == "payment authorization failures"
+    assert "payment-failure" in body["runbook_ids"]
+
+
+def test_runbook_search_reports_an_unavailable_index(tmp_path):
+    def unavailable(_query):
+        raise RuntimeError("runbook index is empty")
+
+    application = create_app(str(tmp_path / "incidents.sqlite3"), runbook_search=unavailable)
+    api = TestClient(application)
+
+    response = api.get("/runbooks", params={"q": "payment"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "runbook index is empty"
+
+
 def test_health_and_missing_incident(tmp_path):
     api = client(tmp_path)
     assert api.get("/healthz").json() == {"status": "ok"}
