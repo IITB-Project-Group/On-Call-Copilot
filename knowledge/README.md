@@ -398,6 +398,11 @@ incident = save_incident(
     reviewed_by="on-call lead",
 )
 ```
+To run command from PowerShell and save in MemoryStore and SQLlite db:
+
+```powershell
+& .\.venv\Scripts\python.exe -c "from knowledge.memory import save_incident; i = save_incident(service='payment', symptom='Checkout error rate exceeded 5% for 8 minutes and payment requests were failing', root_cause='paymentFailure enabled', preconditions=['Feature flag paymentFailure is enabled','Payment service traces show errors during failed checkouts'], lesson='Payment-service errors are usually caused by the paymentFailure feature flag when trace evidence and flag state match.', fix='Disabled paymentFailure flag after approval', reviewed_by='on-call lead'); print(i)"
+```
 
 ### Search incidents
 
@@ -410,6 +415,12 @@ def find_similar_incidents(query: str, top_k: int = 5) -> list[IncidentMatch]:
 
 
 matches = find_similar_incidents("checkout failing due to payment errors")
+```
+
+To run from PowerShell to search the Memory Store and print the full `Incident` as JSON:
+
+```powershell
+& .\.venv\Scripts\python.exe -c "from knowledge.memory import search_incidents; [print(m.score, m.incident) for m in search_incidents('payment failure during checkout')]"
 ```
 
 ### Storage and configuration
