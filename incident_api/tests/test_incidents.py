@@ -53,6 +53,8 @@ def test_webhook_stores_firing_alert(tmp_path):
     assert 'fetch("/incidents?state=" + view)' in page.text
     assert ">Closed<" in page.text
     assert 'id="expression"' in page.text
+    assert "No allow-listed action was proposed for this service." in page.text
+    assert 'if (!incident.decision) return "";' in page.text
 
     again = api.post("/webhooks/alert", json=ALERT)
     assert again.json()["incidents"][0]["id"] == incident["id"]

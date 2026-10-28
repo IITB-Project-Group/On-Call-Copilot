@@ -181,6 +181,7 @@ PAGE = """<!DOCTYPE html>
       <div id="stream" hidden>
         <h2>Issue</h2>
         <p id="issue"></p>
+        <p id="alert" class="meta"></p>
         <p class="kicker">What was checked</p>
         <ol id="events" class="events"></ol>
         <p class="kicker">Query checked</p>
@@ -195,7 +196,7 @@ PAGE = """<!DOCTYPE html>
         <p id="effect" class="effect" hidden></p>
         <form id="decision-form">
           <label for="command">Note</label>
-          <textarea id="command"></textarea>
+          <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
           <div id="controls">
             <div class="actions">
               <button id="approve" type="button">Approve this command</button>
@@ -215,6 +216,7 @@ PAGE = """<!DOCTYPE html>
     const lead = document.querySelector("#lead");
     const command = document.querySelector("#command");
     const issue = document.querySelector("#issue");
+    const alertName = document.querySelector("#alert");
     const expression = document.querySelector("#expression");
     const message = document.querySelector("#message");
     const stream = document.querySelector("#stream");
@@ -287,17 +289,23 @@ PAGE = """<!DOCTYPE html>
       return incident.service === "checkout" || incident.service === "payment";
     }
 
-    function generatedNote(incident) {
-      return incident.command_text.includes("Expression:");
+    function severityOf(incident) {
+      const severity = (payloadOf(incident).labels || {}).severity;
+      if (typeof severity !== "string" || !severity.trim()) return "";
+      const text = severity.trim();
+      return text.charAt(0).toUpperCase() + text.slice(1);
     }
 
     function noteFor(incident) {
-      if (!incident.decision && generatedNote(incident)) return summaryOf(incident);
+      if (!incident.decision) return "";
       return incident.command_text;
     }
 
     function statusLine(incident) {
-      const parts = [isOpen(incident) ? (firing(incident) ? "Firing" : "Not firing") : decisionLabel(incident)];
+      const parts = [];
+      const severity = severityOf(incident);
+      if (severity) parts.push(severity);
+      parts.push(isOpen(incident) ? (firing(incident) ? "Firing" : "Not firing") : decisionLabel(incident));
       if (isOpen(incident)) parts.push("open " + age(incident.starts_at));
       parts.push("started " + when(incident.starts_at));
       if (!isOpen(incident)) parts.push("closed " + when(incident.updated_at));
@@ -312,7 +320,7 @@ PAGE = """<!DOCTYPE html>
       if (!open && incident.decision === "approve") return "Approved. The shop was left unchanged.";
       if (!open) return "Rejected. The shop was left unchanged.";
       if (writesFlag(incident)) return "Approving closes this incident. " + flagPolicy;
-      return "Approving stores the note and closes this incident. " + readableName(incident.service) + " has no automatic flag change.";
+      return "No allow-listed action was proposed for this service. Approving stores the note and closes this incident.";
     }
 
     function renderPayload(incident) {
@@ -357,6 +365,7 @@ PAGE = """<!DOCTYPE html>
       decision.hidden = false;
       title.textContent = readableName(incident.service);
       issue.textContent = summaryOf(incident);
+      alertName.textContent = readableName(incident.alert_name);
       state.textContent = statusLine(incident);
       state.className = "meta " + (
         incident.decision === "approve" ? "approved" :
@@ -385,13 +394,16 @@ PAGE = """<!DOCTYPE html>
       decision.hidden = true;
       command.value = "";
       issue.textContent = "";
+      alertName.textContent = "";
       expression.textContent = "";
     }
 
     function queueDetail(incident) {
-      if (!isOpen(incident)) return decisionLabel(incident) + " · " + when(incident.updated_at);
+      const severity = severityOf(incident);
+      const prefix = severity ? severity + " · " : "";
+      if (!isOpen(incident)) return prefix + decisionLabel(incident) + " · " + when(incident.updated_at);
       const label = incident.decision === "edit" ? "Edited" : (firing(incident) ? "Firing" : "Not firing");
-      return label + " · " + age(incident.starts_at);
+      return prefix + label + " · " + age(incident.starts_at);
     }
 
     function listSignature(shown) {
