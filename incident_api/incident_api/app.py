@@ -43,7 +43,26 @@ def default_db_path() -> str:
         return str(Path(tempfile.gettempdir()) / "oncall-incidents.sqlite3")
 
 
-def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
+_runbook_search = None
+
+
+def default_runbook_search():
+    """Load the in-memory runbook index once for this process."""
+    global _runbook_search
+    if _runbook_search is None:
+        from knowledge.retrieval.contracts import RetrievalRequest
+        from knowledge.retrieval.runtime import initialize_local_retrieval_service
+
+        service = initialize_local_retrieval_service()
+
+        def search(query: str):
+            return service.retrieve(RetrievalRequest(query=query))
+
+        _runbook_search = search
+    return _runbook_search
+
+
+def create_app(db_path: str | None = None, on_approve=None, runbook_search=None) -> FastAPI:
     change_flag = set_payment_failure_off if on_approve is None else on_approve
     store = IncidentStore(db_path or default_db_path())
     registry = CollectorRegistry()
@@ -84,6 +103,21 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict:
         return {"status": "ok"}
+
+    @app.get("/runbooks")
+    def search_runbooks(q: str = "") -> dict:
+        if not q.strip():
+            raise HTTPException(status_code=400, detail="q must not be empty")
+        try:
+            selected = runbook_search if runbook_search is not None else default_runbook_search()
+            response = selected(q)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return {
+            "query": response.query,
+            "runbook_ids": list(response.runbook_ids),
+            "postmortem_ids": list(response.postmortem_ids),
+        }
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:

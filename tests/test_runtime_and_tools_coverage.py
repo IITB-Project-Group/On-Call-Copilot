@@ -9,7 +9,7 @@ from knowledge.retrieval import index as retrieval_index
 from knowledge.retrieval.build_index import index_knowledge_corpus, load_retrieval_documents
 from knowledge.retrieval.contracts import RetrievalRequest, RetrievalResponse
 from knowledge.retrieval.runbooks_kb_tool import RunbooksKBTool, create_runbooks_kb_tool
-from knowledge.retrieval.runtime import initialize_retrieval_service
+from knowledge.retrieval.runtime import initialize_local_retrieval_service, initialize_retrieval_service
 
 
 class StubEncoder:
@@ -32,6 +32,27 @@ def _corpus(tmp_path, runbook_body="# Steps\nRestart the payment service."):
     )
     (knowledge_dir / "policies" / "policy.md").write_text("# Policy\nNot retrievable.\n", encoding="utf-8")
     return knowledge_dir
+
+
+def test_local_retrieval_service_searches_without_chroma(tmp_path):
+    service = initialize_local_retrieval_service(knowledge_dir=_corpus(tmp_path))
+
+    response = service.retrieve(RetrievalRequest(query="payment service"))
+
+    assert response.runbook_ids == ["payment"]
+
+
+def test_local_retrieval_service_rejects_an_empty_corpus(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    blank = tmp_path / "blank"
+    (blank / "runbooks").mkdir(parents=True)
+    (blank / "runbooks" / "empty.md").write_text("---\nid: empty\n---\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="No runbook or postmortem documents"):
+        initialize_local_retrieval_service(knowledge_dir=empty)
+    with pytest.raises(RuntimeError, match="produced no passage chunks"):
+        initialize_local_retrieval_service(knowledge_dir=blank)
 
 
 def test_load_retrieval_documents_only_returns_runbooks_and_postmortems(tmp_path):
@@ -91,6 +112,24 @@ def test_main_indexes_and_prints_a_summary(tmp_path, capsys, monkeypatch):
     assert "New or updated passages: 2" in output
     assert "Total passages in collection: 2" in output
     assert f"Persistent store: {persist}" in output
+
+
+def test_main_prints_provider_failures_and_exits(capsys, monkeypatch):
+    def fail(**_kwargs):
+        raise build_index.OpenRouterError(
+            "OpenRouter embeddings request for model baai/bge-m3 failed (HTTP 404): "
+            "Model blocked by guardrail"
+        )
+
+    monkeypatch.setattr(build_index, "index_knowledge_corpus", fail)
+
+    code = build_index.main([])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out == ""
+    assert "Model blocked by guardrail" in captured.err
+    assert "Traceback" not in captured.err
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")

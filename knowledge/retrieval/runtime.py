@@ -9,6 +9,7 @@ from .chunker import chunk_markdown_documents
 from .index import (
     ChromaPassageStore,
     EmbeddingEncoder,
+    HashedTokenEncoder,
     HybridCandidateIndex,
     RetrievalCandidate,
     create_embedding_encoder,
@@ -27,6 +28,38 @@ class _RewriteCountOverride:
 
     def search_reranked(self, query: str) -> list[RetrievalCandidate]:
         return self._index.search_reranked(query, query_rewrite_count=self._query_rewrite_count)
+
+
+class _HybridSearch:
+    """Serve hybrid BM25 and hash search without calling a reranker."""
+
+    def __init__(self, index: HybridCandidateIndex) -> None:
+        self._index = index
+
+    def search_reranked(self, query: str) -> list[RetrievalCandidate]:
+        return self._index.search_hybrid(query)
+
+
+def initialize_local_retrieval_service(
+    *,
+    knowledge_dir: str | Path | None = None,
+) -> RetrievalService:
+    """Index runbooks in memory with the local hash encoder.
+
+    The incident API uses this at startup. It does not call OpenRouter and does
+    not open the Chroma collection.
+    """
+    source_directory = Path(knowledge_dir or (_REPOSITORY_ROOT / "knowledge"))
+    documents = load_retrieval_documents(source_directory)
+    if not documents:
+        raise RuntimeError(f"No runbook or postmortem documents found under {source_directory}")
+
+    chunks = chunk_markdown_documents(documents)
+    if not chunks:
+        raise RuntimeError("Runbook and postmortem documents produced no passage chunks")
+
+    search_index = HybridCandidateIndex(chunks, HashedTokenEncoder())
+    return RetrievalService(_HybridSearch(search_index), documents)
 
 
 def initialize_retrieval_service(

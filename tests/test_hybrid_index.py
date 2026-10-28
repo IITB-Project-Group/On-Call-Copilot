@@ -611,8 +611,8 @@ def test_openrouter_encoder_applies_e5_task_prefixes():
     assert json.loads(query_request.data)["input"] == ["query: card payment failed"]
 
 
-def test_encoder_factory_only_accepts_openrouter():
-    """The configured embedding factory should reject removed local providers."""
+def test_encoder_factory_accepts_openrouter_and_local_hashes():
+    """OpenRouter remains the remote encoder, and local hashing needs no API key."""
     with patch.dict(
         "os.environ",
         {
@@ -626,21 +626,21 @@ def test_encoder_factory_only_accepts_openrouter():
     assert isinstance(encoder, OpenAICompatibleEmbeddingEncoder)
     assert encoder.model == "baai/bge-m3"
 
-    try:
-        create_embedding_encoder(provider="local", model_name="all-MiniLM-L6-v2")
-    except ValueError as error:
-        assert "openrouter" in str(error)
-    else:
-        raise AssertionError("The removed local provider should not be accepted")
+    local_encoder = create_embedding_encoder(provider="local", model_name="local/hashed-tokens")
+    from knowledge.retrieval.index import HashedTokenEncoder
+
+    assert isinstance(local_encoder, HashedTokenEncoder)
+    assert local_encoder.model == "local/hashed-tokens"
+
+    with pytest.raises(ValueError, match="openrouter"):
+        create_embedding_encoder(provider="sentence-transformers")
 
 
 def test_encoder_factory_loads_settings_from_dotenv(tmp_path, monkeypatch):
     """The encoder factory should load provider credentials from the configured .env."""
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text(
-        "EMBEDDING_PROVIDER=openrouter\n"
-        "EMBEDDING_MODEL=baai/bge-m3\n"
-        "EMBEDDING_API_KEY=dotenv-test-key\n",
+        "EMBEDDING_PROVIDER=openrouter\nEMBEDDING_MODEL=baai/bge-m3\nEMBEDDING_API_KEY=dotenv-test-key\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(retrieval_index, "_DOTENV_PATH", dotenv_path)

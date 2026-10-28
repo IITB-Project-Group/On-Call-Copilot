@@ -237,6 +237,16 @@ if (( console_ready == 0 )); then
   exit 1
 fi
 
+echo "Checking the runbook index inside the incident API."
+if ! runbook_search="$(
+  curl -fsS -m 10 --get --data-urlencode "q=payment authorization failures" \
+    "http://127.0.0.1:${INCIDENT_PORT}/runbooks"
+)"; then
+  echo "Runbook search did not answer on http://127.0.0.1:${INCIDENT_PORT}/runbooks." >&2
+  exit 1
+fi
+echo "  ${runbook_search}"
+
 echo
 echo "Astronomy Shop is up."
 echo "  Web store         http://localhost:${HOST_PORT}/"
@@ -245,6 +255,7 @@ echo "  Jaeger            http://localhost:${HOST_PORT}/jaeger/ui/"
 echo "  Feature flags     http://localhost:${HOST_PORT}/feature"
 echo "  Load generator    http://localhost:${HOST_PORT}/loadgen/"
 echo "  Incident console  http://localhost:${INCIDENT_PORT}/"
+echo "  Runbook search    http://localhost:${INCIDENT_PORT}/runbooks?q=payment+authorization+failures"
 echo
 echo "A service whose error rate stays above 5% over 2 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
 echo

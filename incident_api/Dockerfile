@@ -7,6 +7,10 @@ COPY schemas ./schemas
 COPY api ./api
 COPY ui ./ui
 COPY tools ./tools
+COPY knowledge/__init__.py ./knowledge/__init__.py
+COPY knowledge/retrieval ./knowledge/retrieval
+COPY knowledge/runbooks ./knowledge/runbooks
+COPY knowledge/postmortems ./knowledge/postmortems
 COPY incident_api/incident_api ./incident_api
 
 ENV INCIDENT_DB=/data/incidents.sqlite3

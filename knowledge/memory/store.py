@@ -172,10 +172,7 @@ class MemoryStore:
             score = self._cosine_similarity(query_vector, vector)
             scored.append((score, incident))
         scored.sort(key=lambda result: (-result[0], result[1].id))
-        return [
-            IncidentMatch(incident=incident, score=score)
-            for score, incident in scored[:top_k]
-        ]
+        return [IncidentMatch(incident=incident, score=score) for score, incident in scored[:top_k]]
 
     @staticmethod
     def _validate_embedding(embedding: Sequence[float]) -> list[float]:

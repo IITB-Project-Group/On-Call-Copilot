@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 from .chunker import chunk_markdown_documents
-from .index import ChromaPassageStore, EmbeddingEncoder, create_embedding_encoder
+from .index import ChromaPassageStore, EmbeddingEncoder, OpenRouterError, create_embedding_encoder
 from .ingest import IngestedDocument, load_markdown_documents
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -74,12 +75,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args(argv)
 
-    summary = index_knowledge_corpus(
-        knowledge_dir=args.knowledge_dir,
-        persist_directory=args.persist_directory,
-        collection_name=args.collection_name,
-        batch_size=args.batch_size,
-    )
+    try:
+        summary = index_knowledge_corpus(
+            knowledge_dir=args.knowledge_dir,
+            persist_directory=args.persist_directory,
+            collection_name=args.collection_name,
+            batch_size=args.batch_size,
+        )
+    except OpenRouterError as error:
+        print(error, file=sys.stderr)
+        return 1
     print(f"Source documents: {summary.document_count}")
     print(f"Passage chunks: {summary.chunk_count}")
     print(f"New or updated passages: {summary.changed_count}")

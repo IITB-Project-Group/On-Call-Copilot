@@ -1,7 +1,9 @@
 import json
 import math
 import sys
+from io import BytesIO
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -9,7 +11,9 @@ from knowledge.retrieval import index as retrieval_index
 from knowledge.retrieval.index import (
     ChromaPassageStore,
     HybridCandidateIndex,
+    HashedTokenEncoder,
     OpenAICompatibleEmbeddingEncoder,
+    OpenRouterError,
     OpenRouterReranker,
     RetrievalCandidate,
     _cosine_similarity,
@@ -79,6 +83,54 @@ def _rerank_with(payload, candidates=None, top_n=2):
         return reranker.rerank("query", candidates or _candidates("a", "b"), top_n=top_n)
 
 
+def test_hashed_token_encoder_is_deterministic_and_normalized():
+    encoder = HashedTokenEncoder()
+    payment = encoder.encode(["Payment authorization failed"])
+    repeated = encoder.encode_documents(["Payment authorization failed"])
+    other = encoder.encode_queries(["ad service cpu"])
+    empty = encoder.encode([""])
+
+    assert payment == repeated
+    assert payment != other
+    assert math.isclose(math.sqrt(sum(value * value for value in payment[0])), 1.0)
+    assert empty == [[1.0, *([0.0] * 255)]]
+    with pytest.raises(ValueError, match="dimensions must be positive"):
+        HashedTokenEncoder(dimensions=0)
+
+
+def test_hashed_embedding_replaces_a_cancelled_vector(monkeypatch):
+    monkeypatch.setattr(retrieval_index.math, "sqrt", lambda _value: 0.0)
+
+    assert retrieval_index._hash_embedding("payment", 4) == [1.0, 0.0, 0.0, 0.0]
+
+
+def test_local_encoder_factory_ignores_a_remote_model_name(monkeypatch):
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
+    monkeypatch.setenv("EMBEDDING_MODEL", "baai/bge-m3")
+
+    encoder = retrieval_index.create_embedding_encoder()
+
+    assert isinstance(encoder, HashedTokenEncoder)
+    assert encoder.model == "local/hashed-tokens"
+
+
+def test_search_reranked_returns_the_fused_ranking_when_reranking_is_blocked():
+    chunks = [
+        _chunk("payment-0", "payment authorization failures at checkout"),
+        _chunk("ad-0", "ad service cpu saturation"),
+    ]
+    index = HybridCandidateIndex(chunks, HashedTokenEncoder())
+
+    class BlockedReranker:
+        def rerank(self, query, candidates, top_n):
+            raise OpenRouterError("Model blocked by guardrail")
+
+    results = index.search_reranked("payment checkout failures", reranker=BlockedReranker(), top_k=1)
+
+    assert [result.chunk["chunk_id"] for result in results] == ["payment-0"]
+    assert results[0].rank == 1
+
+
 def test_embedding_encoder_requires_api_key_and_model():
     with pytest.raises(ValueError, match="EMBEDDING_API_KEY"):
         OpenAICompatibleEmbeddingEncoder(model="model")
@@ -106,6 +158,96 @@ def test_embedding_encoder_requires_one_vector_per_text(payload):
 def test_embedding_encoder_rejects_invalid_vectors(embedding):
     with pytest.raises(ValueError, match="invalid vector"):
         _encode_with({"data": [{"index": 0, "embedding": embedding}]})
+
+
+def _http_error(body: bytes, *, code: int = 404, reason: object = "Not Found") -> HTTPError:
+    return HTTPError(
+        "https://openrouter.ai/api/v1/embeddings",
+        code,
+        reason,  # type: ignore[arg-type]
+        hdrs=None,
+        fp=BytesIO(body),
+    )
+
+
+def test_embedding_request_reports_the_provider_message_without_the_api_key():
+    error = _http_error(json.dumps({"error": {"message": "Model blocked by guardrail"}}).encode())
+    encoder = OpenAICompatibleEmbeddingEncoder(api_key="super-secret-key", model="baai/bge-m3")
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=error):
+        with pytest.raises(OpenRouterError, match="Model blocked by guardrail") as raised:
+            encoder.encode(["passage"])
+
+    message = str(raised.value)
+    assert "HTTP 404" in message
+    assert "baai/bge-m3" in message
+    assert "super-secret-key" not in message
+
+
+@pytest.mark.parametrize(
+    ("body", "reason", "expected"),
+    [
+        (b"provider unavailable", "Not Found", "provider unavailable"),
+        (b"[]", "Not Found", "[]"),
+        (b'{"error": "blocked"}', "Not Found", '{"error": "blocked"}'),
+        (b'{"error": {"message": 1}}', "Not Found", '{"error": {"message": 1}}'),
+        (b"", "Not Found", "Not Found"),
+        (b"", None, "the provider returned an empty error"),
+        (b'{"error": {"message": "  spaced message  "}}', "Not Found", "spaced message"),
+    ],
+)
+def test_embedding_request_uses_the_best_available_error_text(body, reason, expected):
+    error = _http_error(body, reason=reason)
+    encoder = OpenAICompatibleEmbeddingEncoder(api_key="key", model="model")
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=error):
+        with pytest.raises(OpenRouterError) as raised:
+            encoder.encode(["passage"])
+
+    assert expected in str(raised.value)
+
+
+def test_embedding_request_truncates_a_long_provider_message():
+    detail = "x" * 600
+    error = _http_error(json.dumps({"error": {"message": detail}}).encode())
+    encoder = OpenAICompatibleEmbeddingEncoder(api_key="key", model="model")
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=error):
+        with pytest.raises(OpenRouterError) as raised:
+            encoder.encode(["passage"])
+
+    assert "x" * 500 in str(raised.value)
+    assert "x" * 501 not in str(raised.value)
+
+
+def test_embedding_request_reports_network_and_timeout_failures():
+    encoder = OpenAICompatibleEmbeddingEncoder(api_key="key", model="model", timeout_seconds=30)
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=URLError("name lookup failed")):
+        with pytest.raises(OpenRouterError, match="name lookup failed"):
+            encoder.encode(["passage"])
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=TimeoutError()):
+        with pytest.raises(OpenRouterError, match="timed out after 30 seconds"):
+            encoder.encode(["passage"])
+
+
+def test_embedding_request_rejects_a_non_json_success_body():
+    encoder = OpenAICompatibleEmbeddingEncoder(api_key="key", model="model")
+
+    with patch("knowledge.retrieval.index.urlopen") as mocked_urlopen:
+        _respond(mocked_urlopen, b"not-json")
+        with pytest.raises(OpenRouterError, match="not JSON"):
+            encoder.encode(["passage"])
+
+
+def test_rerank_request_reports_an_http_failure():
+    error = _http_error(json.dumps({"error": {"message": "rerank blocked"}}).encode())
+    reranker = OpenRouterReranker(api_key="key", model="cohere/rerank-v3.5")
+
+    with patch("knowledge.retrieval.index.urlopen", side_effect=error):
+        with pytest.raises(OpenRouterError, match="rerank blocked"):
+            reranker.rerank("query", _candidates("a"), top_n=1)
 
 
 def test_reranker_requires_credentials_and_model():
