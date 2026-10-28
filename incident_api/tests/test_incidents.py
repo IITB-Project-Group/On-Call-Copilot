@@ -52,7 +52,7 @@ def test_webhook_stores_firing_alert(tmp_path):
     assert 'incident.decision !== "approve"' in page.text
     assert 'fetch("/incidents?state=" + view)' in page.text
     assert ">Closed<" in page.text
-    assert "Query Prometheus used" in page.text
+    assert 'id="expression"' in page.text
 
     again = api.post("/webhooks/alert", json=ALERT)
     assert again.json()["incidents"][0]["id"] == incident["id"]

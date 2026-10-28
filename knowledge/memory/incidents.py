@@ -23,7 +23,7 @@ def save_incident(
     preconditions: Sequence[str],
     lesson: str,
     fix: str,
-    reviewed_by: str
+    reviewed_by: str,
 ) -> Incident:
     """Save an incident in SQLite and the in-process semantic memory store."""
     incident = Incident(
