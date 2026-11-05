@@ -54,6 +54,7 @@ class IncidentStore:
                 ON incidents(alert_name, service, starts_at)
                 """
             )
+            self._ensure_columns(connection)
 
     def create(
         self,
@@ -150,6 +151,33 @@ class IncidentStore:
             )
         return self.get(incident_id)
 
+    def set_proposal(
+        self,
+        incident_id: str,
+        *,
+        request_id: str,
+        code: str,
+        command: str,
+    ) -> dict | None:
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE incidents
+                SET approval_request_id = ?, confirmation_code = ?, proposed_command = ?
+                WHERE id = ?
+                """,
+                (request_id, code, command, incident_id),
+            )
+            if cursor.rowcount == 0:
+                return None
+        return self.get(incident_id)
+
+    def _ensure_columns(self, connection: sqlite3.Connection) -> None:
+        present = {row[1] for row in connection.execute("PRAGMA table_info(incidents)")}
+        for name in ("approval_request_id", "confirmation_code", "proposed_command"):
+            if name not in present:
+                connection.execute(f"ALTER TABLE incidents ADD COLUMN {name} TEXT")
+
 
 def _note(alert_name: str, service: str, starts_at: str, payload: str) -> str:
     try:
@@ -174,4 +202,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "decision": row["decision"],
         "approved_text": row["approved_text"],
         "updated_at": row["updated_at"],
+        "approval_request_id": row["approval_request_id"],
+        "confirmation_code": row["confirmation_code"],
+        "proposed_command": row["proposed_command"],
     }

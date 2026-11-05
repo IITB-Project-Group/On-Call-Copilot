@@ -19,12 +19,18 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = [".", "incident_api"]
+pythonpath = [".", "incident_api", "safety"]
 testpaths = ["tests", "incident_api/tests"]
 
 [tool.ruff]
 line-length = 110
-extend-exclude = ["opentelemetry-demo", ".bob"]
+extend-exclude = [
+  "opentelemetry-demo",
+  ".bob",
+  "safety",
+  "tests/guardrails",
+  "Copilot security testing for integration testing",
+]
 
 [tool.coverage.run]
 branch = true

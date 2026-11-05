@@ -1,0 +1,30 @@
+name: security-gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guardrails:
+    name: Guardrails and API security
+    runs-on: ubuntu-latest
+    env:
+      COPILOT_LLM: "off"
+      PYTHONUTF8: "1"
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r incident_api/requirements-dev.txt
+
+      - name: Input, output, hook, and approval suites
+        run: python -m pytest -q tests/guardrails tests/test_webhook_security.py
