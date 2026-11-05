@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from api.live_screen import require_clean_descriptions, screen_retrieval
 from knowledge.retrieval.runbooks_kb_tool import create_runbooks_kb_tool
 
 TOOL_NAMES = ("search",)
@@ -22,11 +23,12 @@ def search(query: str) -> dict[str, Any]:
         return {"ok": False, "error": str(exc), "query": query}
     body = asdict(response)
     body["ok"] = True
-    return body
+    return screen_retrieval(body)
 
 
 def build_server(factory=None):
     """Register runbook search. Pass a factory in tests to avoid installing FastMCP."""
+    require_clean_descriptions("runbooks-kb", (search,))
     mcp_cls = factory if factory is not None else load_fastmcp()
     mcp = mcp_cls("runbooks-kb")
     mcp.tool(search)

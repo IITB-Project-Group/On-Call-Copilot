@@ -52,7 +52,9 @@ def webhook_secret() -> bytes | None:
 
 
 def input_guardrails(secret: bytes | None) -> InputGuardrails:
-    return InputGuardrails(webhook_secret=secret, allowed_alertnames=SHOP_ALERTS)
+    from api.live_screen import guardrails
+
+    return guardrails(secret, SHOP_ALERTS)
 
 
 def _error(result) -> str:
@@ -135,28 +137,82 @@ class FlagOutcome:
     result: str | None = None
 
 
+class AlertRateLimiter:
+    """Refuse a webhook flood. Thirty accepted calls per minute is the shared cap."""
+
+    def __init__(self, per_minute: int = 30) -> None:
+        self.per_minute = per_minute
+        self._hits: list[float] = []
+
+    def allow(self, now: float | None = None) -> bool:
+        import time
+
+        moment = time.time() if now is None else now
+        self._hits = [hit for hit in self._hits if moment - hit < 60]
+        if len(self._hits) >= self.per_minute:
+            return False
+        self._hits.append(moment)
+        return True
+
+
+class PersistentAuditLog(AuditLog):
+    """Hash-chained audit that reloads the JSONL file after a process restart."""
+
+    def __init__(self, path: str | None = None) -> None:
+        super().__init__(path)
+        if not path or not os.path.exists(path):
+            return
+        loaded: list[dict] = []
+        try:
+            with open(path, encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    loaded.append(json.loads(line))
+        except json.JSONDecodeError:
+            return
+        self._entries = loaded
+        if not self.verify():
+            self._entries = []
+
+
 class SafetyGate:
     """Exact-command approval and a hook-guarded flag write for one process."""
 
-    def __init__(self, write_flag) -> None:
+    def __init__(self, write_flag, audit_path: str | None = None) -> None:
         self.write_flag = write_flag
-        self.audit = AuditLog()
+        self.audit = PersistentAuditLog(audit_path)
         self.approvals = ApprovalService(
             ApproverRoster([Approver("oncall", frozenset({"oncall"}))]),
             audit=self.audit,
         )
-        self.ig = InputGuardrails(allowed_alertnames=SHOP_ALERTS)
+        self.ig = input_guardrails(None)
 
     def _executor(self) -> GuardedExecutor:
         return GuardedExecutor(
             HookManager(
-                default_hooks(input_guardrails=self.ig, approval_gate=self.approvals), audit=self.audit
+                default_hooks(
+                    input_guardrails=self.ig,
+                    approval_gate=self.approvals,
+                    previous_state=self._previous_state,
+                ),
+                audit=self.audit,
             ),
             {"ops_set_flag": self._write},
         )
 
+    @staticmethod
+    def _previous_state(_incident_id: str) -> dict:
+        return {"flags": {"paymentFailure": True}}
+
     def _write(self, action, approval_request_id, phase="forward"):
-        self.last_result = self.write_flag()
+        del approval_request_id, phase
+        flag = str(action["args"]["flag"])
+        variant = "on" if action["args"]["enabled"] else "off"
+        try:
+            self.last_result = self.write_flag(flag, variant)
+        except TypeError:
+            self.last_result = self.write_flag()
         return self.last_result
 
     def propose(self, incident_id: str, service: str):
@@ -197,6 +253,21 @@ class SafetyGate:
             "ops_set_flag",
             {"action": PAYMENT_ACTION, "approval_request_id": request_id, "phase": "forward"},
         )
+        return self._outcome(outcome)
+
+    def rollback(self, incident_id: str, request_id: str | None) -> FlagOutcome:
+        """Restore the flag that the approved forward action changed."""
+        if not request_id:
+            return FlagOutcome(False, 400, "No approval request is open for this incident")
+        outcome = self._executor().call_tool(
+            incident_id,
+            "remediation",
+            "ops_set_flag",
+            {"action": PAYMENT_ROLLBACK, "approval_request_id": request_id, "phase": "rollback"},
+        )
+        return self._outcome(outcome)
+
+    def _outcome(self, outcome) -> FlagOutcome:
         if outcome.ok:
             return FlagOutcome(True, 200, "", str(self.last_result))
         if "kill_switch" in outcome.reason or outcome.reason.startswith("incident_halted"):
