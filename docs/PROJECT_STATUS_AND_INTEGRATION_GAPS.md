@@ -6,20 +6,26 @@ Assessment date: 5 November 2026.
 
 The project has a monitored shop, an incident console, telemetry adapters, a
 substantial knowledge-retrieval component, incident-memory functions, and safety
-controls. The main remaining work is the integrated copilot that investigates an
+controls. On the running cluster, a checkout alert can be screened, rejected
+when the confirmation is wrong, and closed by turning `paymentFailure` off.
+The main remaining work is the integrated copilot that investigates an
 incident, proposes an evidence-backed fix, obtains approval, verifies recovery,
-and produces a reviewed postmortem.
+and produces a reviewed postmortem. Before that, `up.sh` on main does not
+publish this cluster's tool ports, trace queries miss Jaeger's real path, and
+the flag write does not finish when the evaluation port is silent.
 
 The first completion milestone should be:
 
 **Payment alert -> supported diagnosis -> exact approval -> flag change ->
 verified recovery -> reviewed incident record.**
 
-This assessment is based on repository code and the local environment reported
-by the project owner. It does not independently verify the running deployment,
-test results, generated retrieval index, or the original capstone PDF. Scope
-references come from the repository's root README, which identifies itself as
-the capstone build contract.
+This assessment uses main, including the safety layer and the live-data
+screening merged in pull request 8, and a check of the running kind cluster on
+5 November 2026. It does not re-derive the original capstone PDF. Two open
+branches differ from main and are named where that matters: pull request 7
+makes the shop tools reach this cluster, and `safety-live-controls` starts the
+copilot MCP servers. Scope references come from the repository's root README,
+which identifies itself as the capstone build contract.
 
 The root README's statement that runbooks and agents are still to be built is
 partly outdated: knowledge retrieval and incident memory are substantially
@@ -29,18 +35,20 @@ implemented, while the agent packages remain mostly placeholders.
 
 | Area | Available capability | Integration status |
 | --- | --- | --- |
-| Demo infrastructure | `up.sh`, `down.sh`, and Kubernetes configuration for the Astronomy Shop and incident API. | The project owner reports the shop and supporting pods running locally. |
+| Demo infrastructure | `up.sh`, `down.sh`, and Kubernetes configuration for the Astronomy Shop and incident API. | The kind cluster was up on 5 November 2026, with the shop and incident API answering. `up.sh` on main stops before the tool port-forwards on this chart. |
 | Alerting | `ServiceErrorRateHigh`, using a five-minute error-rate window and an additional one-minute pending period. | Alertmanager is configured to feed the incident API. |
 | Incident API | Webhook, incident list/detail, decisions, health, metrics, and SQLite storage. | Connected to the console and payment approval path. |
 | Incident console | Open/closed views, streamed incident snapshots, editable notes, approve/reject controls, and confirmation-code input. | Shows stored state, not a full investigation timeline. |
-| Telemetry | PromQL, logs, traces, flag-state inspection, service error/request rates, p95 latency, and metric discovery. | Callable adapters exist; the live webhook does not invoke the investigation that uses them. |
+| Telemetry | PromQL, logs, traces, flag-state inspection, service error/request rates, p95 latency, and metric discovery. | The adapters answered on the running cluster. The live webhook does not invoke the investigation that uses them. The code default trace path `/jaeger` returns 404; this shop serves traces at `/jaeger/ui`. |
 | Knowledge corpus | 15 runbooks and 10 seed postmortems, including a misleading-lesson example. | Available to retrieval. |
 | Retrieval | Metadata-preserving ingestion/chunking, BM25, semantic search, Chroma, rank fusion, query rewriting, reranking, and tool adapters. | Callable from the payment investigation, but not wired into live incident intake. |
 | Incident memory | SQLite save, semantic search, and lesson applicability checks. | Not connected to the console's completion path. |
 | Payment investigation | Telemetry reads, knowledge retrieval, payment hypothesis, and dry-run action proposal. | Implemented separately from the active API alert/approval path. |
-| Flag remediation | Read/write a selected flag variant and check that flagd serves it. | Live approval is wired specifically to disable `paymentFailure`. |
-| Safety | Input/output guardrails, redaction, approval service, command binding, hooks, budgets, loop limits, and kill switch. | Webhook screening and the payment write are integrated; investigation-wide enforcement is not. |
+| Flag remediation | Read/write a selected flag variant and poll flagd until it serves that variant. | Live approval is wired specifically to disable `paymentFailure`. On this cluster the pod could read the flag document and the evaluation port did not answer, so main's poll does not finish. |
+| Safety | Input/output guardrails, redaction, approval service, command binding, hooks, budgets, loop limits, kill switch, and a hardened detector on live tool text. | Webhook screening, the payment write, and screening inside the log, trace, and runbook tools are integrated. The webhook does not call those tools. Investigation-wide enforcement is not. |
 | CI | Lint/format, Python tests with coverage, API image build, and guardrail/API-security workflow. | Definitions exist; there is no full incident evaluation gate. |
+| Copilot MCP | Read-only telemetry tools and runbook search, with FastMCP wrappers. | On main the wrappers are not started. `safety-live-controls` serves them at `http://127.0.0.1:8012/mcp` and `http://127.0.0.1:8013/mcp`, and both answered on the cluster. Agents do not call them yet. |
+| Shop MCP | The Astronomy Shop Helm release runs `astronomy-shop-mcp` for cart, checkout, and product lookup. | The pod is up in the cluster on port 8011. It is not the incident tool server, and `up.sh` does not publish that port. |
 
 ### Local environment reported by the owner
 
@@ -55,9 +63,20 @@ implemented, while the agent packages remain mostly placeholders.
 | Prometheus | http://localhost:9090/ |
 | OpenSearch | http://localhost:9200/ |
 | Flag configuration | http://localhost:4000/api/read |
+| Telemetry MCP | http://127.0.0.1:8012/mcp |
+| Runbooks MCP | http://127.0.0.1:8013/mcp |
+
+On 5 November 2026 the shop, Grafana, Jaeger UI, feature flags, load generator,
+incident console, Prometheus, OpenSearch, and flagd URLs above answered. The
+two MCP URLs answered from `safety-live-controls`, not from main. `up.sh` on
+main looks for a Prometheus service named `prometheus-server`. This chart names
+it `prometheus`, so that script exits before it publishes Prometheus,
+OpenSearch, and flagd. Pull request 7 and `safety-live-controls` recognize the
+name this cluster uses.
 
 Running pods establish infrastructure availability, not completion of the agent
-workflow. A deployed image can also differ from the code inspected here.
+workflow. The incident API image that completed the live flag write included
+the pull request 7 fallback. Main's image still waits on the evaluation port.
 
 ### Component qualifications
 
@@ -69,8 +88,34 @@ workflow. A deployed image can also differ from the code inspected here.
 - Incident memory records service, symptom, root cause, fix, lesson,
   preconditions, failure family, and reviewer. Retrieved lessons can be applied
   or rejected according to applicability conditions.
-- Safety functions and hooks exist beyond the live path. Their presence does
-  not establish that every telemetry, retrieval, or model call uses them.
+- Safety functions and hooks exist beyond the live path. Logs, traces, and
+  retrieved runbook text are screened when those tool functions run. Metrics,
+  flag changes, and lessons are not screened on that same path, and the live
+  webhook does not call the tools.
+- `frontend-web` is not a known service, so an alert that names it is rejected.
+- `SafetyGate.rollback` can turn `paymentFailure` back on. No console route
+  calls it, and the predefined rollback assumes the flag was on rather than
+  saving the previous variant.
+
+### Checked on the running cluster
+
+- Host tool calls returned error ratios, rates, latency, metric names, and an
+  empty set of active flags. `paymentFailure` was `off`.
+- Checkout traces returned spans at `/jaeger/ui`. The same call at the code
+  default `/jaeger` returned HTTP 404. Payment had no error spans in the last
+  hour, and a payment error-log search returned no lines.
+- Alertmanager had opened incidents for `ad`, `cart`, `frontend`,
+  `frontend-proxy`, and `recommendation`. None of those had a confirmation
+  code. Checkout was about a 3.4% error ratio, under the 5% page line, so it
+  had not paged on its own.
+- A posted checkout alert stored its summary as untrusted telemetry. A wrong
+  confirmation returned 400 and left the request pending. The matching code,
+  against the pull request 7 image, returned `paymentFailure is off`.
+- Runbook search answered and returned `EMBEDDING_PROVIDER must be
+  'openrouter'`. The incident API image has no embedding key.
+- The copilot telemetry server listed its nine read tools and returned a live
+  error ratio. The runbooks server listed `search`. The in-cluster shop MCP
+  server listed cart, checkout, and product tools.
 
 ## 2. Current live incident path
 
@@ -91,7 +136,13 @@ The safety gate uses a predefined payment diagnosis and plan. It does not first
 invoke `run_payment_incident()` to inspect telemetry, confirm flag state, retrieve
 a runbook, and establish the cause.
 
-After approval, the flag tool checks that flagd serves the requested variant.
+After approval, main's flag tool writes the flag document and then polls
+flagd's evaluation port until that port serves the variant. From the incident
+API pod the flag document on port 4000 answered and the evaluation port on
+8016 did not, so the poll fails. The approval can be left executed while the
+incident decision stays unset. Pull request 7 accepts the flag document when
+the evaluation port does not answer.
+
 The API does not invoke `verify_payment_incident()` in this path. An approved
 incident is classified as closed without demonstrated service recovery.
 
@@ -116,6 +167,8 @@ with operational resolution.
 | Memory functions | Save reviewed incidents after postmortem completion and retrieve them in later investigations. |
 | Safety hooks | Maintain one incident-wide budget/execution state across tools, models, actions, and replans. |
 | Metrics | Record actual diagnosis/recovery durations, tool calls, cost, and rollbacks. |
+| Shop tool ports | `up.sh` must find the Prometheus service named `prometheus`, trace queries must use `/jaeger/ui`, and a flag write must finish when the evaluation port is silent. |
+| Copilot MCP | After `safety-live-controls` merges, point the commander at the telemetry and runbooks servers. The payment function currently calls the Python clients in-process. |
 
 Shared contracts also need alignment. The graph's action proposal uses a flag
 `variant`, while the safety plan uses an `enabled` argument. Both must agree on
@@ -165,7 +218,8 @@ runbooks, safe action selection, and verification criteria.
 
 A generic flag writer exists, but it is not a general approved action executor.
 Restart, scale, and operational rollback adapters remain to be implemented if
-retained in the final build scope.
+retained in the final build scope. The flag restore on `SafetyGate.rollback`
+is separate from those adapters and is not exposed by the console.
 
 ### Recovery, rollback, and replanning
 
@@ -216,10 +270,16 @@ cannot establish broad retrieval quality.
 
 If the commander runs in the incident API pod, telemetry URLs must use cluster
 service addresses rather than laptop `localhost` endpoints. The inspected
-deployment configures flagd addresses, but not the other telemetry endpoints.
+deployment configures flagd addresses, but not Prometheus, Jaeger, or
+OpenSearch. The host tools reached those services through `up.sh` port-forwards.
+Jaeger on this shop is served by the frontend proxy at `/jaeger/ui`, not at
+`/jaeger` or on port 16686.
 
 Package retrieval dependencies, index storage, provider configuration, and
-incident memory for the chosen execution location.
+incident memory for the chosen execution location. Runbook search on the host
+rejected `EMBEDDING_PROVIDER=local` and requires `openrouter`. Wiring that
+search into the pod before the deployment has a provider and a key will fail
+closed.
 
 The incident database uses Kubernetes `emptyDir`, so it does not survive pod
 replacement. Approval requests and the live gate's audit are held in process
@@ -231,9 +291,11 @@ complete investigation lifecycle.
 
 ### End-to-end safety integration
 
-Screen telemetry, runbooks, tool descriptions, and lessons before they reach
-models or decision logic. Validate generated diagnoses, plans, communications,
-and memory writes. Exercise injection and budget controls through the real
+Logs, traces, and retrieved runbook text are screened in the tool functions,
+and an MCP server refuses a tool description that carries an instruction.
+Metrics, flag changes, and lessons still need that screening before a model or
+a decision uses them. Validate generated diagnoses, plans, communications, and
+memory writes. Exercise injection and budget controls through the real
 commander, not only isolated safety functions.
 
 The live webhook supports optional signatures: when its secret is unset,
@@ -246,12 +308,13 @@ policy. A confirmation code binds an action; it is not user authentication.
 
 | Priority | Deliverable | Completion criterion |
 | --- | --- | --- |
-| 1 | Payment investigation integration | A live alert produces persisted telemetry evidence, knowledge citations, and a supported proposal. |
-| 2 | Approved action and recovery | The actual generated action is approved/executed; resolution follows sustained recovery, not approval alone. |
-| 3 | Durable safe lifecycle | Workflow/approval state survives restart; incident-wide budgets, rollback, and replanning are connected. |
-| 4 | Reviewed communications and memory | Cited postmortems are reviewed, stored, and reused only under matching preconditions. |
-| 5 | Broader faults and agents | Additional faults and real parallel diagnosis operate through the same contracts and safety controls. |
-| 6 | Evaluation and observability | Ground-truth incident suite, required comparisons, held-out gate, and agent dashboards are operational. |
+| 1 | Reachable shop tools | `up.sh` publishes Prometheus, OpenSearch, and flagd for this chart; traces use `/jaeger/ui`; a flag write finishes when the evaluation port is silent. |
+| 2 | Payment investigation integration | A live alert produces persisted telemetry evidence, knowledge citations, and a supported proposal. Runbook search can run in the place that investigation runs. |
+| 3 | Approved action and recovery | The actual generated action is approved and executed; resolution follows sustained recovery, not approval alone. The console can roll the flag back. |
+| 4 | Durable safe lifecycle | Workflow/approval state survives restart; incident-wide budgets, rollback, and replanning are connected. |
+| 5 | Reviewed communications and memory | Cited postmortems are reviewed, stored, and reused only under matching preconditions. |
+| 6 | Broader faults and agents | Additional faults and real parallel diagnosis operate through the same contracts and safety controls. The commander calls the copilot MCP servers. |
+| 7 | Evaluation and observability | Ground-truth incident suite, required comparisons, held-out gate, and agent dashboards are operational. |
 
 ## 6. Source map
 
@@ -262,9 +325,11 @@ policy. A confirmation code binds an action; it is not user authentication.
 | API lifecycle | `incident_api/incident_api/app.py`, `incident_api/incident_api/store.py` |
 | Console | `ui/page.py`, `api/stream.py` |
 | Live safety/approval | `api/safety_gate.py`, `safety/approval_service.py`, `safety/hooks.py` |
+| Live tool screening | `api/live_screen.py`, `safety/hardened_detector.py` |
 | Safety validation | `safety/input_guardrails.py`, `safety/output_guardrails.py` |
 | Payment slice | `graph/steps.py` |
 | Telemetry/actions | `tools/telemetry/`, `tools/actions/set_flag.py` |
+| Copilot MCP | `tools/mcp_runtime.py`, `tools/telemetry/server.py`, `tools/runbooks/server.py`, `up.sh`. The HTTP servers and the `up.sh` launch are on `safety-live-controls`; main has the tool modules and does not start them. |
 | Knowledge/memory | `knowledge/README.md`, `knowledge/retrieval/`, `knowledge/memory/` |
 | Agent placeholders | `agents/` |
 | Evaluation | `eval/cases.py`, `knowledge/evaluation/golden_queries.yaml` |
