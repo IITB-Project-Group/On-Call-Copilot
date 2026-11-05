@@ -240,7 +240,7 @@ fi
 prom_svc="$(
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get svc -o name |
     sed 's|service/||' |
-    awk '/prometheus-server$/ { print; exit }'
+    awk '$0 == "prometheus" || $0 == "prometheus-server" || $0 ~ /-prometheus-server$/ { print; exit }'
 )"
 if [[ -z "${prom_svc}" ]]; then
   echo "No Prometheus server service in namespace ${NAMESPACE}." >&2

@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from tools.actions import set_flag as flag_module
 from tools.actions.set_flag import FlagWriteError, set_flag, set_payment_failure_off
 
 
@@ -177,3 +178,39 @@ def test_set_flag_explains_a_bad_flag_service_response(monkeypatch):
             set_flag("paymentFailure", "off")
     finally:
         server.shutdown()
+
+
+def test_set_flag_confirms_through_the_ui_when_ofrep_times_out(monkeypatch):
+    document = {
+        "paymentFailure": {
+            "defaultVariant": "100%",
+            "variants": {"off": 0, "100%": 1},
+        }
+    }
+
+    class Handler(_QuietHandler):
+        def do_GET(self):
+            self._send({"flags": document})
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+            document["paymentFailure"]["defaultVariant"] = body["data"]["flags"]["paymentFailure"][
+                "defaultVariant"
+            ]
+            self._send({})
+
+    server = _point_at(monkeypatch, _serve(Handler))
+    monkeypatch.setenv("FLAGD_OFREP_URL", "http://127.0.0.1:9")
+    try:
+        assert set_flag("paymentFailure", "off") == "paymentFailure is off"
+        assert flag_module._ui_has_variant("http://127.0.0.1:9", "paymentFailure", "off") is False
+    finally:
+        server.shutdown()
+
+    def timeout(request, timeout=8):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(flag_module.urllib.request, "urlopen", timeout)
+    with pytest.raises(FlagWriteError, match="unreachable"):
+        flag_module._request("POST", "http://flagd/ofrep/v1/evaluate/flags/paymentFailure", {})

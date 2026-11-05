@@ -18,7 +18,7 @@ class Settings:
 
     @property
     def JAEGER_BASE_PATH(self) -> str:
-        return os.environ.get("JAEGER_BASE_PATH", "/jaeger").rstrip("/")
+        return os.environ.get("JAEGER_BASE_PATH", "/jaeger/ui").rstrip("/")
 
     @property
     def OPENSEARCH_URL(self) -> str:
