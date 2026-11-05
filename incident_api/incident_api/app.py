@@ -19,16 +19,17 @@ from prometheus_client import (
 )
 from pydantic import BaseModel, Field
 
-from api.alerts import firing_alerts
+from api.safety_gate import FLAG_SERVICES, SafetyGate, screen_webhook
 from api.stream import snapshot_event
 from incident_api.store import DECISIONS, IncidentStore
-from tools.actions import FlagWriteError, set_payment_failure_off
+from tools.actions import set_payment_failure_off
 from ui.page import PAGE
 
 
 class DecisionBody(BaseModel):
     decision: str
     text: str = Field(default="")
+    confirmation: str = Field(default="")
 
 
 def default_db_path() -> str:
@@ -78,8 +79,10 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         registry=registry,
     )
 
+    gate = SafetyGate(change_flag)
     app = FastAPI(title="On-Call Copilot incident API")
     app.state.store = store
+    app.state.gate = gate
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -106,12 +109,29 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
 
     @app.post("/webhooks/alert")
     async def webhook(request: Request) -> dict:
-        body = await request.json()
+        raw = await request.body()
+        alerts, error = screen_webhook(
+            raw,
+            request.headers.get("x-signature"),
+            request.headers.get("x-timestamp"),
+        )
+        if error:
+            raise HTTPException(status_code=400, detail=error)
         created = []
-        for alert in firing_alerts(body):
-            incident, is_new = store.create(**alert.model_dump())
+        for alert in alerts:
+            incident, is_new = store.create(**alert)
             if is_new:
                 incidents_total.inc()
+                proposal = gate.propose(incident["id"], incident["service"])
+                if proposal is not None:
+                    request_id, code, command = proposal
+                    saved = store.set_proposal(
+                        incident["id"],
+                        request_id=request_id,
+                        code=code,
+                        command=command,
+                    )
+                    incident = saved or incident
             created.append(incident)
         return {"incidents": created}
 
@@ -123,13 +143,25 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         if current is None:
             raise HTTPException(status_code=404, detail="incident not found")
         flag_result = None
-        if body.decision == "approve" and current["service"] in {"checkout", "payment"}:
-            try:
-                flag_result = change_flag()
-            except FlagWriteError as exc:
-                raise HTTPException(status_code=502, detail=str(exc)) from exc
+        if body.decision == "approve" and current["service"] in FLAG_SERVICES:
+            outcome = gate.execute(incident_id, current.get("approval_request_id"), body.confirmation)
+            if not outcome.ok:
+                raise HTTPException(status_code=outcome.status, detail=outcome.detail)
+            flag_result = outcome.result
         try:
             updated = store.decide(incident_id, body.decision, body.text)
+            if body.decision == "edit" and current["service"] in FLAG_SERVICES:
+                gate.release(incident_id)
+                proposal = gate.propose(incident_id, current["service"])
+                if proposal is not None and updated is not None:
+                    request_id, code, command = proposal
+                    saved = store.set_proposal(
+                        incident_id,
+                        request_id=request_id,
+                        code=code,
+                        command=command,
+                    )
+                    updated = saved or updated
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if updated is None:

@@ -7,9 +7,10 @@ COPY schemas ./schemas
 COPY api ./api
 COPY ui ./ui
 COPY tools ./tools
+COPY safety ./safety
 COPY incident_api/incident_api ./incident_api
 
 ENV INCIDENT_DB=/data/incidents.sqlite3
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/safety
 EXPOSE 8000
 CMD ["uvicorn", "incident_api.app:app", "--host", "0.0.0.0", "--port", "8000"]

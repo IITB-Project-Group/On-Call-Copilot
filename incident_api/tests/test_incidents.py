@@ -33,6 +33,14 @@ def client(tmp_path, on_approve=None):
     return TestClient(application)
 
 
+def approve(api, incident_id, text):
+    incident = api.get(f"/incidents/{incident_id}").json()
+    body = {"decision": "approve", "text": text}
+    if incident.get("confirmation_code"):
+        body["confirmation"] = incident["confirmation_code"]
+    return api.post(f"/incidents/{incident_id}/decision", json=body)
+
+
 def test_webhook_stores_firing_alert(tmp_path):
     api = client(tmp_path)
     response = api.post("/webhooks/alert", json=ALERT)
@@ -74,10 +82,7 @@ def test_stream_event_contains_the_incident(tmp_path):
 def test_edit_clears_approval(tmp_path):
     api = client(tmp_path)
     incident_id = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
-    approved = api.post(
-        f"/incidents/{incident_id}/decision",
-        json={"decision": "approve", "text": "set_flag paymentFailure off"},
-    )
+    approved = approve(api, incident_id, "set_flag paymentFailure off")
     assert approved.status_code == 200
     assert approved.json()["approved_text"] == "set_flag paymentFailure off"
     assert approved.json()["flag_result"] == "paymentFailure is off"
@@ -91,6 +96,12 @@ def test_edit_clears_approval(tmp_path):
     assert body["decision"] == "edit"
     assert body["approved_text"] is None
     assert body["command_text"] == "set_flag paymentFailure off later"
+    edited_again = api.post(
+        f"/incidents/{incident_id}/decision",
+        json={"decision": "edit", "text": "set_flag paymentFailure off after review"},
+    )
+    assert edited_again.status_code == 200
+    assert edited_again.json()["command_text"] == "set_flag paymentFailure off after review"
 
 
 def test_approve_does_not_record_when_the_flag_write_fails(tmp_path):
@@ -99,10 +110,7 @@ def test_approve_does_not_record_when_the_flag_write_fails(tmp_path):
 
     api = client(tmp_path, on_approve=fail)
     incident_id = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
-    failed = api.post(
-        f"/incidents/{incident_id}/decision",
-        json={"decision": "approve", "text": "set_flag paymentFailure off"},
-    )
+    failed = approve(api, incident_id, "set_flag paymentFailure off")
     assert failed.status_code == 502
     stored = api.get(f"/incidents/{incident_id}").json()
     assert stored["decision"] is None
@@ -114,10 +122,7 @@ def test_open_query_returns_waiting_incidents_only(tmp_path):
     incident_id = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
     assert [row["id"] for row in api.get("/incidents?state=open").json()] == [incident_id]
 
-    approved = api.post(
-        f"/incidents/{incident_id}/decision",
-        json={"decision": "approve", "text": "set_flag paymentFailure off"},
-    )
+    approved = approve(api, incident_id, "set_flag paymentFailure off")
     assert approved.status_code == 200
     assert api.get("/incidents?state=open").json() == []
     assert [row["id"] for row in api.get("/incidents?state=closed").json()] == [incident_id]
@@ -148,7 +153,7 @@ def test_same_alert_on_two_services_creates_two_incidents(tmp_path):
         "alerts": [
             {
                 "status": "firing",
-                "labels": {"alertname": "ServiceErrorRateHigh", "service": "agent", "service_name": "agent"},
+                "labels": {"alertname": "ServiceErrorRateHigh", "service": "ad", "service_name": "ad"},
                 "annotations": {"summary": "agent error rate is above 5% for 5 minutes."},
                 "startsAt": "2026-10-19T15:00:00Z",
             }
@@ -168,7 +173,7 @@ def test_same_alert_on_two_services_creates_two_incidents(tmp_path):
     checkout_row = api.post("/webhooks/alert", json=checkout).json()["incidents"][0]
     agent_row = api.post("/webhooks/alert", json=other).json()["incidents"][0]
     assert checkout_row["id"] != agent_row["id"]
-    assert {checkout_row["service"], agent_row["service"]} == {"checkout", "agent"}
+    assert {checkout_row["service"], agent_row["service"]} == {"checkout", "ad"}
     assert first["id"] != checkout_row["id"]
 
 
@@ -186,7 +191,7 @@ def test_approve_changes_the_payment_flag_only_for_checkout_or_payment(tmp_path)
             "alerts": [
                 {
                     "status": "firing",
-                    "labels": {"alertname": "ServiceErrorRateHigh", "service": "agent"},
+                    "labels": {"alertname": "ServiceErrorRateHigh", "service": "ad"},
                     "annotations": {"summary": "agent error rate is above 5% for 5 minutes."},
                     "startsAt": "2026-10-26T06:40:00Z",
                 }
@@ -229,10 +234,7 @@ def test_blank_edit_is_rejected_and_blank_approval_keeps_the_note(tmp_path):
     assert blank.status_code == 400
     assert api.get(f"/incidents/{incident['id']}").json()["decision"] is None
 
-    approved = api.post(
-        f"/incidents/{incident['id']}/decision",
-        json={"decision": "approve", "text": ""},
-    )
+    approved = approve(api, incident["id"], "")
     assert approved.status_code == 200
     assert approved.json()["approved_text"] == incident["command_text"]
 

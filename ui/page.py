@@ -83,7 +83,7 @@ PAGE = """<!DOCTYPE html>
       cursor: pointer;
     }
     #list button[aria-current="true"] { border-left-color: var(--ink); background: var(--panel); }
-    #list button:focus-visible, .views button:focus-visible, .actions button:focus-visible, textarea:focus-visible {
+    #list button:focus-visible, .views button:focus-visible, .actions button:focus-visible, textarea:focus-visible, input:focus-visible {
       outline: 2px solid var(--ink);
       outline-offset: 2px;
     }
@@ -135,17 +135,17 @@ PAGE = """<!DOCTYPE html>
     }
     .effect { color: var(--muted); }
     label { display: block; margin-bottom: 0.35rem; font-weight: 600; }
-    textarea {
+    textarea, input {
       width: 100%;
-      min-height: 6.5rem;
       padding: 0.7rem 0.75rem;
       border: 1px solid var(--line);
       background: var(--bg);
       color: inherit;
       font: inherit;
       line-height: 1.4;
-      resize: vertical;
     }
+    textarea { min-height: 6.5rem; resize: vertical; }
+    input { margin-bottom: 0.75rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
     .actions button {
       background: var(--ink);
@@ -195,6 +195,8 @@ PAGE = """<!DOCTYPE html>
         <div id="payload" class="payload" hidden></div>
         <p id="effect" class="effect" hidden></p>
         <form id="decision-form">
+          <label for="confirmation">Confirmation code</label>
+          <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
           <label for="command">Note</label>
           <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
           <div id="controls">
@@ -215,6 +217,7 @@ PAGE = """<!DOCTYPE html>
     const state = document.querySelector("#state");
     const lead = document.querySelector("#lead");
     const command = document.querySelector("#command");
+    const confirmation = document.querySelector("#confirmation");
     const issue = document.querySelector("#issue");
     const alertName = document.querySelector("#alert");
     const expression = document.querySelector("#expression");
@@ -329,7 +332,10 @@ PAGE = """<!DOCTYPE html>
       effect.hidden = !flag;
       if (!flag) return;
       payload.replaceChildren();
-      for (const line of ["set_flag", "flag: paymentFailure", "value: off"]) {
+      const lines = ["set_flag", "flag: paymentFailure", "value: off"];
+      if (incident.proposed_command) lines.push(incident.proposed_command);
+      if (incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
+      for (const line of lines) {
         const row = document.createElement("div");
         row.textContent = line;
         payload.appendChild(row);
@@ -497,7 +503,11 @@ PAGE = """<!DOCTYPE html>
         const response = await fetch("/incidents/" + current + "/decision", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ decision: decisionName, text: command.value })
+          body: JSON.stringify({
+            decision: decisionName,
+            text: command.value,
+            confirmation: confirmation.value
+          })
         });
         if (!response.ok) {
           message.textContent = await response.text();
