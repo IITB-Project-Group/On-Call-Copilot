@@ -1,37 +1,45 @@
-"""Runbooks-KB MCP server (L7, READ).
+"""Runbook search tool.
 
-Exposes hybrid search over runbooks + postmortems (BM25 + vector + RRF + cross
--encoder rerank). Returns citable passage IDs. READ-only.
-
-Run standalone:  python -m mcp_servers.runbooks_kb.server
+Search calls the in-process knowledge service and returns the full retrieval response,
+including complete runbook text. ``build_server`` is only the optional FastMCP wrapper.
 """
+
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
-from fastmcp import FastMCP
+from knowledge.retrieval.runbooks_kb_tool import create_runbooks_kb_tool
 
-from retrieval.hybrid_search import get_retriever
-
-mcp = FastMCP("runbooks-kb")
+TOOL_NAMES = ("search",)
 
 
-@mcp.tool
-def search(query: str, k: int = 5) -> dict[str, Any]:
-    """Search runbooks + postmortems for passages relevant to the query.
-
-    Returns ranked passages with citable IDs and metadata (service, flag, type).
-    READ-only.
-    """
-    hits = get_retriever().search(query, k=k)
-    return {"query": query, "results": [
-        {"id": h["id"], "service": h["metadata"].get("service"),
-         "flag": h["metadata"].get("flag"), "type": h["metadata"].get("type"),
-         "score": round(h.get("rerank_score", 0.0), 3),
-         "preconditions": h["metadata"].get("preconditions"),
-         "excerpt": h["text"][:240]}
-        for h in hits]}
+def search(query: str) -> dict[str, Any]:
+    """Return ranked runbooks and postmortems for one incident query."""
+    try:
+        response = create_runbooks_kb_tool()(query)
+    except (RuntimeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc), "query": query}
+    body = asdict(response)
+    body["ok"] = True
+    return body
 
 
-if __name__ == "__main__":
-    mcp.run()
+def build_server(factory=None):
+    """Register runbook search. Pass a factory in tests to avoid installing FastMCP."""
+    mcp_cls = factory if factory is not None else load_fastmcp()
+    mcp = mcp_cls("runbooks-kb")
+    mcp.tool(search)
+    return mcp
+
+
+def load_fastmcp():
+    """Import FastMCP when a server process actually starts."""
+    from fastmcp import FastMCP
+
+    return FastMCP
+
+
+def main() -> None:
+    """Run the runbooks MCP server."""
+    build_server().run()

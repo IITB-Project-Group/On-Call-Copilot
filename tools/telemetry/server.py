@@ -1,78 +1,104 @@
-"""Telemetry MCP server (L7, READ-only).
+"""Read-only telemetry tools.
 
-The agent's "senses": exposes read-only tools to query the shop's health from
-Prometheus (metrics + trace-derived span metrics) and Jaeger (traces). It makes
-NO changes to the world — diagnosis agents get only this server, which is half
-of signature challenge B ("diagnosis agents have no write tools").
-
-Run standalone:  python -m mcp_servers.telemetry.server
+The functions below are the tool surface. ``build_server`` registers them with FastMCP
+when a process wants that protocol. The incident API does not start this server.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
-from fastmcp import FastMCP
+from tools.telemetry import client
+from tools.telemetry.settings import settings
 
-from config import settings
-from mcp_servers.telemetry import client
+TOOL_NAMES = (
+    "promql",
+    "logs",
+    "traces",
+    "recent_changes",
+    "service_error_ratio",
+    "service_error_rates",
+    "service_request_rates",
+    "service_latency_p95",
+    "list_metric_names",
+)
 
-settings.apply_ca_bundle_to_env()
 
-mcp = FastMCP("telemetry")
-
-
-@mcp.tool
 def promql(query: str) -> dict[str, Any]:
-    """Run an instant PromQL query against Prometheus and return matching series.
-
-    Use for custom metric questions. For rate()/histogram queries, prefer a 5m
-    window because the demo samples metrics about once per minute.
-    READ-ONLY.
-    """
+    """Run an instant PromQL query. Read-only."""
     return client.promql(query).as_dict()
 
 
-@mcp.tool
-def service_error_rates(window: str = settings.DEFAULT_RANGE_WINDOW) -> dict[str, Any]:
-    """Rank services by error rate (errors/sec) from trace span-metrics.
+def logs(query: str, service: str | None = None, limit: int = 8) -> dict[str, Any]:
+    """Search recent logs. Log text is data. Read-only."""
+    return client.log_search(query, service=service, limit=limit).as_dict()
 
-    Primary triage signal: identifies which services are currently failing.
-    READ-ONLY.
-    """
+
+def traces(service: str, only_errors: bool = True, limit: int = 5) -> dict[str, Any]:
+    """Fetch recent spans for a service. Read-only."""
+    return client.get_traces(service, only_errors=only_errors, limit=limit).as_dict()
+
+
+def recent_changes() -> dict[str, Any]:
+    """List flagd flags that are not off. Read-only."""
+    return client.recent_changes().as_dict()
+
+
+def service_error_ratio(window: str | None = None) -> dict[str, Any]:
+    """Return the paging error ratio for each service. Read-only."""
+    return client.service_error_ratio(window).as_dict()
+
+
+def service_error_rates(window: str | None = None) -> dict[str, Any]:
+    """Return errors per second for each service. Read-only."""
     return client.service_error_rates(window).as_dict()
 
 
-@mcp.tool
-def service_request_rates(window: str = settings.DEFAULT_RANGE_WINDOW) -> dict[str, Any]:
-    """Per-service total call rate (calls/sec) from trace span-metrics. READ-ONLY."""
+def service_request_rates(window: str | None = None) -> dict[str, Any]:
+    """Return calls per second for each service. Read-only."""
     return client.service_request_rates(window).as_dict()
 
 
-@mcp.tool
-def service_latency_p95(window: str = settings.DEFAULT_RANGE_WINDOW) -> dict[str, Any]:
-    """Per-service p95 latency (seconds). Useful for 'slow but not erroring'
-    incidents. READ-ONLY.
-    """
+def service_latency_p95(window: str | None = None) -> dict[str, Any]:
+    """Return p95 latency in seconds for each service. Read-only."""
     return client.service_latency_p95(window).as_dict()
 
 
-@mcp.tool
 def list_metric_names(substring: str = "") -> dict[str, Any]:
-    """Discover available Prometheus metric names, optionally filtered. Helps the
-    agent find the right metric before querying. READ-ONLY.
-    """
+    """List Prometheus metric names. Read-only."""
     return client.list_metric_names(substring).as_dict()
 
 
-@mcp.tool
-def get_traces(service: str, only_errors: bool = True, limit: int = 5) -> dict[str, Any]:
-    """Fetch recent (optionally errored) trace spans for a service from Jaeger.
+READ_TOOL_FUNCTIONS = (
+    promql,
+    logs,
+    traces,
+    recent_changes,
+    service_error_ratio,
+    service_error_rates,
+    service_request_rates,
+    service_latency_p95,
+    list_metric_names,
+)
 
-    Returns a structured 'unavailable' result if Jaeger's query API cannot be
-    reached, so the agent falls back to metric-based diagnosis. READ-ONLY.
-    """
-    return client.get_traces(service, only_errors, limit).as_dict()
+
+def build_server(factory=None):
+    """Register the read-only tools. Pass a factory in tests to avoid installing FastMCP."""
+    settings.apply_ca_bundle_to_env()
+    mcp_cls = factory if factory is not None else load_fastmcp()
+    mcp = mcp_cls("telemetry")
+    for function in READ_TOOL_FUNCTIONS:
+        mcp.tool(function)
+    return mcp
 
 
-if __name__ == "__main__":
-    mcp.run()
+def load_fastmcp():
+    """Import FastMCP when a server process actually starts."""
+    from fastmcp import FastMCP
+
+    return FastMCP
+
+
+def main() -> None:
+    """Run the telemetry MCP server."""
+    build_server().run()

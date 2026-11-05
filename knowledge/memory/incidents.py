@@ -24,6 +24,7 @@ def save_incident(
     lesson: str,
     fix: str,
     reviewed_by: str,
+    failure_family: str = "",
 ) -> Incident:
     """Save an incident in SQLite and the in-process semantic memory store."""
     incident = Incident(
@@ -34,6 +35,7 @@ def save_incident(
         lesson=_required_text(lesson, "lesson"),
         fix=_required_text(fix, "fix"),
         reviewed_by=_required_text(reviewed_by, "reviewed_by"),
+        failure_family=_optional_text(failure_family, "failure_family"),
     )
     store = _default_memory_store()
     embedding = store.embed_incident(incident)
@@ -55,6 +57,12 @@ def search_incidents(query: str, top_k: int = 5) -> list[IncidentMatch]:
 def _required_text(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must not be empty")
+    return value.strip()
+
+
+def _optional_text(value: str, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
     return value.strip()
 
 

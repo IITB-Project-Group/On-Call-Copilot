@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from knowledge.memory import incidents as incidents_module
@@ -140,6 +142,67 @@ def test_save_rejects_preconditions_that_are_not_a_sequence(tmp_path, monkeypatc
 def test_sqlite_store_rejects_a_memory_database():
     with pytest.raises(ValueError, match="file-backed"):
         SQLiteIncidentStore(":memory:")
+
+
+def test_failure_family_round_trips_and_blank_text_is_stripped(tmp_path, monkeypatch):
+    database_path = tmp_path / "incidents.sqlite3"
+    memory_store = MemoryStore(FakeEncoder())
+    _configure_memory(monkeypatch, database_path, memory_store)
+
+    saved = save_incident(
+        service="payment",
+        symptom="Checkout requests fail",
+        root_cause="paymentFailure enabled",
+        preconditions=["paymentFailure enabled"],
+        lesson="Turn the flag off when the evidence matches",
+        fix="Set paymentFailure off",
+        reviewed_by="on-call lead",
+        failure_family="  payment_failure  ",
+    )
+
+    assert saved.failure_family == "payment_failure"
+    assert SQLiteIncidentStore(database_path).load_all()[0].failure_family == "payment_failure"
+    with pytest.raises(ValueError, match="failure_family must be a string"):
+        save_incident(
+            service="payment",
+            symptom="Checkout requests fail",
+            root_cause="paymentFailure enabled",
+            preconditions=["paymentFailure enabled"],
+            lesson="Turn the flag off when the evidence matches",
+            fix="Set paymentFailure off",
+            reviewed_by="on-call lead",
+            failure_family=None,
+        )
+
+
+def test_older_database_gains_a_failure_family_column(tmp_path):
+    database_path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE incidents (
+                id TEXT PRIMARY KEY,
+                service TEXT NOT NULL,
+                symptom TEXT NOT NULL,
+                root_cause TEXT NOT NULL,
+                preconditions TEXT NOT NULL,
+                lesson TEXT NOT NULL,
+                fix TEXT NOT NULL,
+                reviewed_by TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO incidents VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("old-1", "payment", "symptom", "cause", "[]", "lesson", "fix", "reviewer"),
+        )
+
+    loaded = SQLiteIncidentStore(database_path).load_all()
+
+    assert loaded[0].failure_family == ""
+    assert "failure_family" in {
+        row[1] for row in sqlite3.connect(database_path).execute("PRAGMA table_info(incidents)")
+    }
 
 
 def test_embed_incident_rejects_the_wrong_number_of_vectors():
