@@ -1,18 +1,18 @@
 # OnCall Copilot: Current Status and Integration Gaps
 
 Assessment date: 5 November 2026.
-Reviewed against main commit `eb8c728`, including merged PRs #7, #8, and #9.
+Current assessment of the latest main source and the running environment.
 
 ## Executive summary
 
 The project has a monitored shop, an incident console, telemetry adapters, a
 substantial knowledge-retrieval component, incident-memory functions, and safety
-controls. Main now also includes hardened live-data screening, a guarded payment
+controls. The source includes hardened live-data screening, a guarded payment
 rollback method, reloadable file-backed audit logging, and local HTTP MCP startup.
 The main remaining work is the integrated copilot that investigates an
 incident, proposes an evidence-backed fix, obtains approval, verifies recovery,
-and produces a reviewed postmortem. The previously documented service-discovery,
-Jaeger-path, MCP-startup, and flag-write timeout fixes are now merged.
+and produces a reviewed postmortem. Service discovery, the correct Jaeger path,
+MCP startup, and a flag-write verification fallback are implemented.
 
 The first completion milestone should be:
 
@@ -25,7 +25,7 @@ re-derive the original capstone PDF or verify the generated retrieval index and
 provider execution. Scope references come from the root README, which identifies
 itself as the capstone build contract.
 
-**Merged is not the same as deployed:** the running incident API lacks the new
+**Source and deployment differ:** the running incident API lacks the
 security headers, rate limiter, and file-backed audit wiring present on main.
 The MCP endpoints are reachable and sampled telemetry tools return data.
 
@@ -37,11 +37,11 @@ implemented, while the agent packages remain mostly placeholders.
 
 | Area | Available capability | Integration status |
 | --- | --- | --- |
-| Demo infrastructure | `up.sh`, `down.sh`, and Kubernetes configuration for the Astronomy Shop and incident API. Main now discovers this chart's Prometheus service and manages tool forwards/MCP processes. | Shop and incident API answer; all 32 pods were Running and ready. Startup was inspected, not rerun. |
+| Demo infrastructure | `up.sh`, `down.sh`, and Kubernetes configuration for the Astronomy Shop and incident API. Startup discovers this chart's Prometheus service and manages tool forwards/MCP processes. | Shop and incident API answer; all 32 pods were Running and ready. Startup was inspected, not rerun. |
 | Alerting | `ServiceErrorRateHigh`: maximum per-operation error ratio above 5% over five minutes, service error rate above 0.01 errors/second, and one-minute pending period. | Rule verified in live Prometheus; incident records are present in the API. |
 | Incident API | Webhook, incident list/detail, decisions, health, metrics, and SQLite storage. | Connected to the console and payment approval path. |
 | Incident console | Open/closed views, streamed incident snapshots, editable notes, approve/reject controls, and confirmation-code input. | Shows stored state, not a full investigation timeline. |
-| Telemetry | PromQL, logs, traces, flag-state inspection, service error/request rates, p95 latency, and metric discovery. The default Jaeger prefix is now `/jaeger/ui`. | HTTP MCP is live on port 8012; sampled reads succeed. The webhook still does not invoke investigation. |
+| Telemetry | PromQL, logs, traces, flag-state inspection, service error/request rates, p95 latency, and metric discovery. The default Jaeger prefix is `/jaeger/ui`. | HTTP MCP is live on port 8012; sampled reads succeed. The webhook still does not invoke investigation. |
 | Knowledge corpus | 15 runbooks and 10 seed postmortems, including a misleading-lesson example. | Available to retrieval. |
 | Retrieval | Metadata-preserving ingestion/chunking, BM25, semantic search, Chroma, rank fusion, query rewriting, reranking, and tool adapters. | MCP handshake and `search` registration verified on port 8013; actual search/index/provider availability not exercised in this review. Not wired into live intake. |
 | Incident memory | SQLite save, semantic search, and lesson applicability checks. | Not connected to the console's completion path. |
@@ -50,7 +50,7 @@ implemented, while the agent packages remain mostly placeholders.
 | Safety | Input/output guardrails, redaction, approval service, command binding, hooks, budgets, loop limits, kill switch, and a hardened detector on live tool text. | Webhook screening, the payment write, and screening inside the log, trace, and runbook tools are integrated. The webhook does not call those tools. Investigation-wide enforcement is not. |
 | API protections and audit | Main adds response security headers, a 30-calls/minute webhook limiter, and reloadable hash-chained JSONL audit. | Absent from the running API. Approval requests remain in memory; audit files use the incident data volume. |
 | CI | Lint/format, Python tests with coverage, API image build, and guardrail/API-security workflow. | Definitions exist; there is no full incident evaluation gate. |
-| Copilot MCP | Read-only telemetry and runbook tools, HTTP/stdio launcher, startup readiness checks, and managed shutdown. | Both host HTTP endpoints answer initialization and tool listing. Main now includes startup; the commander does not call them yet. |
+| Copilot MCP | Read-only telemetry and runbook tools, HTTP/stdio launcher, startup readiness checks, and managed shutdown. | Both host HTTP endpoints answer initialization and tool listing. Startup is implemented; the commander does not call them yet. |
 | Shop MCP | The Astronomy Shop Helm release runs `astronomy-shop-mcp` for cart, checkout, and product lookup. | The pod is up in the cluster on port 8011. It is not the incident tool server, and `up.sh` does not publish that port. |
 
 ### Local environment reported by the owner
@@ -70,12 +70,12 @@ implemented, while the agent packages remain mostly placeholders.
 | Runbooks MCP | http://127.0.0.1:8013/mcp |
 
 The current check confirmed the incident API, Prometheus, Jaeger API, OpenSearch,
-flagd, and both MCP endpoints. Main now recognizes the `prometheus` service name,
+flagd, and both MCP endpoints. Startup recognizes the `prometheus` service name,
 uses `/jaeger/ui`, and includes the flag-write fallback.
 
 Running pods establish infrastructure availability, not completion of the agent
 workflow. Host MCP availability also does not establish that the API pod, or
-every running MCP process, contains all merged source changes.
+every running MCP process, matches the latest source.
 
 ### Component qualifications
 
@@ -93,7 +93,7 @@ every running MCP process, contains all merged source changes.
   webhook does not call the tools.
 - Direct client and in-process retrieval calls do not automatically inherit
   the MCP wrappers' screening. `graph/steps.py` uses those direct paths.
-- A successful flag write can now mean configuration read-back after OFREP
+- A successful flag write can mean configuration read-back after OFREP
   verification failed. It does not necessarily confirm served flag evaluation
   and never establishes customer-path recovery on its own.
 - `frontend-web` is not a known service, so an alert that names it is rejected.
@@ -109,7 +109,7 @@ Observed on 5 November 2026, approximately 20:50 IST:
 | --- | --- | --- |
 | Kubernetes | All 32 pods were Running with all containers ready. | Infrastructure availability, not workflow completion. |
 | Incident API | Health OK; 18 incidents, 17 without a decision and one approved. | Intake/storage are active; approval is not proof of recovery. |
-| Deployed code | No `SecurityHeaders`, `AlertRateLimiter`, audit-path wiring, or commander invocation; GET health response lacked the new security headers. | The API pod does not contain all merged changes. |
+| Deployed code | No `SecurityHeaders`, `AlertRateLimiter`, audit-path wiring, or commander invocation; GET health response lacked the source-defined security headers. | The API pod differs from the latest source. |
 | Prometheus | Ready; rule confirmed the five-minute window, 0.01 errors/second minimum, and 60-second pending period. | Paging has an error-volume condition beyond a 5% ratio. |
 | Active alert | `ServiceErrorRateHigh` firing for `flagd`, ratio 1.0. | No root cause was established by this check. |
 | Jaeger | `/jaeger/ui/api/services` returned 21 services; `/jaeger/api/services` returned 404. | The newly corrected prefix matches the live deployment. |
@@ -126,30 +126,6 @@ Targeted local validation passed 31 tests across `test_live_controls.py`,
 `test_mcp_runtime.py`, `test_set_flag.py`, `test_shop_telemetry.py`, and
 `test_tool_servers.py`. This does not establish a full-suite result or verify
 live remediation.
-
-### Earlier live checks retained for context
-
-The following observations were recorded before this review. They include
-mutating checks and earlier branch-specific behavior; they were not repeated.
-Current observations above supersede transient counts and telemetry results.
-
-- Host tool calls returned error ratios, rates, latency, metric names, and an
-  empty set of active flags. `paymentFailure` was `off`.
-- Checkout traces returned spans at `/jaeger/ui`. The same call at the code
-  default `/jaeger` returned HTTP 404. Payment had no error spans in the last
-  hour, and a payment error-log search returned no lines.
-- Alertmanager had opened incidents for `ad`, `cart`, `frontend`,
-  `frontend-proxy`, and `recommendation`. None of those had a confirmation
-  code. Checkout was about a 3.4% error ratio, under the 5% page line, so it
-  had not paged on its own.
-- A posted checkout alert stored its summary as untrusted telemetry. A wrong
-  confirmation returned 400 and left the request pending. The matching code,
-  against the pull request 7 image, returned `paymentFailure is off`.
-- Runbook search answered and returned `EMBEDDING_PROVIDER must be
-  'openrouter'`. The incident API image has no embedding key.
-- The copilot telemetry server listed its nine read tools and returned a live
-  error ratio. The runbooks server listed `search`. The in-cluster shop MCP
-  server listed cart, checkout, and product tools.
 
 ## 2. Current live incident path
 
@@ -172,8 +148,8 @@ a runbook, and establish the cause.
 
 After approval, main's flag tool writes the flag document and attempts OFREP
 evaluation. If evaluation fails but configuration read-back confirms the
-requested variant, the operation returns success. This fallback is now merged
-from PR #7. It verifies stored configuration, not service recovery.
+requested variant, the operation returns success. This verifies stored
+configuration, not service recovery.
 
 The API does not invoke `verify_payment_incident()` in this path. An approved
 incident is classified as closed without demonstrated service recovery.
@@ -199,8 +175,8 @@ with operational resolution.
 | Memory functions | Save reviewed incidents after postmortem completion and retrieve them in later investigations. |
 | Safety hooks | Maintain one incident-wide budget/execution state across tools, models, actions, and replans. |
 | Metrics | Record actual diagnosis/recovery durations, tool calls, cost, and rollbacks. |
-| Shop tool ports | Discovery, Jaeger path, and flag-write fallback are merged. Verify updated deployment behavior rather than treating these as unimplemented fixes. |
-| Copilot MCP | Startup is merged. Connect the commander to the tool servers or apply equivalent safeguards to direct calls; the payment function currently uses Python clients in-process. |
+| Shop tool ports | Discovery, Jaeger path, and flag-write fallback are implemented. Verify deployment behavior rather than treating these as unimplemented features. |
+| Copilot MCP | Startup is implemented. Connect the commander to the tool servers or apply equivalent safeguards to direct calls; the payment function currently uses Python clients in-process. |
 | Guarded rollback | Connect `SafetyGate.rollback()` to verified action failure and incident lifecycle state. |
 | File-backed audit | Deploy new wiring and durable storage; audit reload does not restore in-memory approval requests. |
 
@@ -322,7 +298,7 @@ wiring, and even the new file will be lost on pod replacement unless storage
 changes. Approval requests remain in memory independently of audit persistence.
 Add durable storage and safe approval/workflow recovery.
 
-Deploy the latest API before treating merged protections as live. The startup
+Deploy the latest API before treating source-defined protections as live. The startup
 script rebuilds the fixed `oncall-incident-api:local` tag with
 `imagePullPolicy: Never`, applies an unchanged deployment specification, and
 waits for rollout status. Rebuilding/loading that tag alone does not force an
@@ -355,7 +331,7 @@ policy. A confirmation code binds an action; it is not user authentication.
 | Priority | Deliverable | Completion criterion |
 | --- | --- | --- |
 | 0 | Deploy and reconcile main | Updated API feature markers/protections observed live; active alert and OpenSearch health observations triaged separately. |
-| 1 | Verify merged tool fixes | Discovery, trace path, MCP startup, and flag-write fallback are implemented. Sampled reads pass; a controlled startup/deployment and approved write remain outside this read-only review. |
+| 1 | Verify tool deployment | Discovery, trace path, MCP startup, and flag-write fallback are implemented. Sampled reads pass; a controlled startup/deployment and approved write remain outside this read-only review. |
 | 2 | Payment investigation integration | A live alert produces persisted telemetry evidence, knowledge citations, and a supported proposal. Runbook search can run in the place that investigation runs. |
 | 3 | Approved action and recovery | The actual generated action is approved and executed; resolution follows sustained recovery, not approval alone. The console can roll the flag back. |
 | 4 | Durable safe lifecycle | Workflow/approval state survives restart; incident-wide budgets, rollback, and replanning are connected. |
