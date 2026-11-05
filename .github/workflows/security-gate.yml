@@ -27,4 +27,4 @@ jobs:
         run: python -m pip install -r incident_api/requirements-dev.txt
 
       - name: Input, output, hook, and approval suites
-        run: python -m pytest -q tests/guardrails tests/test_webhook_security.py
+        run: python -m pytest -q tests/guardrails tests/test_webhook_security.py tests/test_live_controls.py
