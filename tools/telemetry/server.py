@@ -1,7 +1,7 @@
 """Read-only telemetry tools.
 
-The functions below are the tool surface. ``build_server`` registers them with FastMCP
-when a process wants that protocol. The incident API does not start this server.
+The functions below are the tool surface. ``build_server`` registers them with FastMCP.
+``up.sh`` serves them at http://127.0.0.1:8012/mcp. The incident API does not start this server.
 """
 
 from __future__ import annotations
@@ -106,5 +106,11 @@ def load_fastmcp():
 
 
 def main() -> None:
-    """Run the telemetry MCP server."""
-    build_server().run()
+    """Run the telemetry MCP server. HTTP when MCP_TRANSPORT=http."""
+    from tools.mcp_runtime import run_server
+
+    run_server(build_server(), port_env="TELEMETRY_MCP_PORT", default_port=8012)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

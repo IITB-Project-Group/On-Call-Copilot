@@ -28,8 +28,9 @@ class FakeMCP:
         self.tools[function.__name__] = function
         return function
 
-    def run(self):
+    def run(self, **kwargs):
         self.ran = True
+        self.kwargs = kwargs
 
 
 def test_ticket_writes_stay_on_the_incident_api():

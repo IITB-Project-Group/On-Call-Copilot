@@ -1,7 +1,7 @@
 """Runbook search tool.
 
 Search calls the in-process knowledge service and returns the full retrieval response,
-including complete runbook text. ``build_server`` is only the optional FastMCP wrapper.
+including complete runbook text. ``up.sh`` serves it at http://127.0.0.1:8013/mcp.
 """
 
 from __future__ import annotations
@@ -43,5 +43,11 @@ def load_fastmcp():
 
 
 def main() -> None:
-    """Run the runbooks MCP server."""
-    build_server().run()
+    """Run the runbooks MCP server. HTTP when MCP_TRANSPORT=http."""
+    from tools.mcp_runtime import run_server
+
+    run_server(build_server(), port_env="RUNBOOKS_MCP_PORT", default_port=8013)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
