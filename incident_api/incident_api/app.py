@@ -19,11 +19,26 @@ from prometheus_client import (
 )
 from pydantic import BaseModel, Field
 
-from api.safety_gate import FLAG_SERVICES, SafetyGate, screen_webhook
+from api.safety_gate import FLAG_SERVICES, AlertRateLimiter, SafetyGate, screen_webhook
 from api.stream import snapshot_event
 from incident_api.store import DECISIONS, IncidentStore
-from tools.actions import set_payment_failure_off
+from tools.actions.set_flag import set_flag
 from ui.page import PAGE
+
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; "
+    "frame-ancestors 'none'"
+)
+_SECURITY_HEADERS = (
+    ("x-frame-options", "DENY"),
+    ("x-content-type-options", "nosniff"),
+    ("content-security-policy", _CSP),
+    ("referrer-policy", "no-referrer"),
+)
+_SECURITY_HEADER_NAMES = {name.encode() for name, _value in _SECURITY_HEADERS}
 
 
 class DecisionBody(BaseModel):
@@ -44,9 +59,31 @@ def default_db_path() -> str:
         return str(Path(tempfile.gettempdir()) / "oncall-incidents.sqlite3")
 
 
+class SecurityHeaders:
+    """Add the headers the deployment check looks for on every response."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = [
+                    item
+                    for item in message.get("headers") or []
+                    if item[0].lower() not in _SECURITY_HEADER_NAMES
+                ]
+                headers.extend((name.encode(), value.encode()) for name, value in _SECURITY_HEADERS)
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
-    change_flag = set_payment_failure_off if on_approve is None else on_approve
-    store = IncidentStore(db_path or default_db_path())
+    chosen = db_path or default_db_path()
+    change_flag = set_flag if on_approve is None else on_approve
+    store = IncidentStore(chosen)
     registry = CollectorRegistry()
     incidents_total = Counter(
         "copilot_incidents_total",
@@ -79,10 +116,12 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         registry=registry,
     )
 
-    gate = SafetyGate(change_flag)
+    gate = SafetyGate(change_flag, audit_path=str(Path(chosen).with_name("audit.jsonl")))
     app = FastAPI(title="On-Call Copilot incident API")
+    app.add_middleware(SecurityHeaders)
     app.state.store = store
     app.state.gate = gate
+    app.state.alerts = AlertRateLimiter()
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -109,6 +148,8 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
 
     @app.post("/webhooks/alert")
     async def webhook(request: Request) -> dict:
+        if not app.state.alerts.allow():
+            raise HTTPException(status_code=429, detail="alert rate limit")
         raw = await request.body()
         alerts, error = screen_webhook(
             raw,
