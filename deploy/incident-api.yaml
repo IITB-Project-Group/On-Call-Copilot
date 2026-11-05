@@ -25,6 +25,10 @@ spec:
           env:
             - name: INCIDENT_DB
               value: /data/incidents.sqlite3
+            - name: FLAGD_UI_URL
+              value: http://flagd:4000
+            - name: FLAGD_OFREP_URL
+              value: http://flagd:8016
           readinessProbe:
             httpGet:
               path: /healthz

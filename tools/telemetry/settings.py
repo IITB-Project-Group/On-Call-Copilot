@@ -26,7 +26,8 @@ class Settings:
 
     @property
     def FLAGD_UI_URL(self) -> str:
-        return _url("FLAGD_UI_URL", "http://flagd:4000")
+        # up.sh publishes flagd on localhost. The incident API pod sets this to the cluster address.
+        return _url("FLAGD_UI_URL", "http://localhost:4000")
 
     @property
     def DEFAULT_RANGE_WINDOW(self) -> str:

@@ -82,7 +82,7 @@ def test_settings_read_the_environment(monkeypatch):
     assert settings.JAEGER_URL == "http://localhost:8080"
     assert settings.JAEGER_BASE_PATH == "/jaeger"
     assert settings.OPENSEARCH_URL == "http://localhost:9200"
-    assert settings.FLAGD_UI_URL == "http://flagd:4000"
+    assert settings.FLAGD_UI_URL == "http://localhost:4000"
     assert settings.DEFAULT_RANGE_WINDOW == "5m"
     assert settings.ERROR_RATIO_WINDOW == "2m"
     settings.apply_ca_bundle_to_env()

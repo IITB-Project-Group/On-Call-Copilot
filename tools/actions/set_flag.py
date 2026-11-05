@@ -19,8 +19,8 @@ def set_payment_failure_off() -> str:
 
 
 def set_flag(flag: str, variant: str) -> str:
-    ui_url = os.environ.get("FLAGD_UI_URL", "http://flagd:4000").rstrip("/")
-    ofrep_url = os.environ.get("FLAGD_OFREP_URL", "http://flagd:8016").rstrip("/")
+    ui_url = os.environ.get("FLAGD_UI_URL", "http://localhost:4000").rstrip("/")
+    ofrep_url = os.environ.get("FLAGD_OFREP_URL", "http://localhost:8016").rstrip("/")
     document = _request("GET", f"{ui_url}/api/read")
     flags = document.get("flags")
     if not isinstance(flags, dict) or flag not in flags:
