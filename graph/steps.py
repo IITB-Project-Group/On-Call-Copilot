@@ -23,13 +23,15 @@ def run_payment_incident(alert: Alert, *, telemetry=None, knowledge=None) -> dic
     ratio_result = telemetry.service_error_ratio("2m")
     trace_result = telemetry.get_traces("payment")
     change_result = telemetry.recent_changes()
+    log_result = telemetry.log_search("error", service="payment")
     variant = _flag_variant(change_result)
     observed = _relevant_ratio(ratio_result, service)
+    log_count, logs_error = _payment_logs(log_result)
     review = knowledge(
         f"{service} errors during checkout",
         incident_service="payment" if service in PAYMENT_SERVICES else service,
         incident_failure_family="payment_failure" if service in PAYMENT_SERVICES else "",
-        incident_evidence=_evidence(observed, variant, trace_result),
+        incident_evidence=_evidence(observed, variant, trace_result, log_count),
     )
     proposal = _proposal(service, variant, observed, trace_result, review["runbook_ids"])
     hypothesis = _hypothesis(service, variant, proposal)
@@ -38,6 +40,8 @@ def run_payment_incident(alert: Alert, *, telemetry=None, knowledge=None) -> dic
         "hypothesis": hypothesis,
         "error_ratio": observed,
         "flag_variant": variant,
+        "log_count": log_count,
+        "logs_error": logs_error,
         "runbook_ids": list(review["runbook_ids"]),
         "lessons": list(review["lessons"]),
         "proposal": None if proposal is None else proposal.model_dump(),
@@ -99,7 +103,14 @@ def _errors_present(ratio: float | None, traces) -> bool:
     return any(item.get("error") for item in traces.series)
 
 
-def _evidence(ratio: float | None, variant: str | None, traces) -> list[str]:
+def _payment_logs(result) -> tuple[int | None, str | None]:
+    """Record that logs were read. Log text stays out of the decision."""
+    if not result.ok:
+        return None, result.error
+    return len(result.series), None
+
+
+def _evidence(ratio: float | None, variant: str | None, traces, log_count: int | None) -> list[str]:
     evidence = []
     if ratio is not None and ratio > RATIO_LIMIT:
         evidence.append("payment service traces show errors")
@@ -107,6 +118,8 @@ def _evidence(ratio: float | None, variant: str | None, traces) -> list[str]:
         evidence.append("paymentFailure enabled")
     if traces.ok and any(item.get("error") for item in traces.series):
         evidence.append("payment trace errors")
+    if log_count:
+        evidence.append("payment service logs show errors")
     return evidence
 
 
