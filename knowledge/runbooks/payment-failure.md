@@ -32,15 +32,15 @@ Propose the following allow-listed action only when the evidence supports `payme
 action: set_flag
 arguments:
   flag: paymentFailure
-  value: false
-expected_effect: Payment errors decrease and checkout error rate returns below the alert threshold.
+  variant: off
+expected_effect: Payment errors decrease and the checkout error rate returns below 5%.
 ```
 
 The on-call engineer must approve this exact action and its arguments. Execute it through the approved operations tool only. Do not use a shell, `docker exec`, or an unreviewed action.
 
 ## Verify recovery
 
-After the action, monitor payment errors and checkout error rate using telemetry tools. Consider recovery verified when the checkout error rate is at or below 5% for at least five minutes and payment-service errors have returned to the normal baseline. Record the observation window and supporting telemetry references.
+After the action, read the five-minute checkout error rate again. Consider recovery verified when that rate is at or below 5%. A rate that stays above 5% is not recovery, and it does not authorize another action. Record the rate and the flag state.
 
 If the metrics do not improve, or worsen, do not claim recovery. Follow the incident workflow to roll back the action if appropriate, obtain approval for the rollback, and replan using the new evidence.
 

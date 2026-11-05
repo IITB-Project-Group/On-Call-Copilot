@@ -237,6 +237,84 @@ if (( console_ready == 0 )); then
   exit 1
 fi
 
+prom_svc="$(
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get svc -o name |
+    sed 's|service/||' |
+    awk '/prometheus-server$/ { print; exit }'
+)"
+if [[ -z "${prom_svc}" ]]; then
+  echo "No Prometheus server service in namespace ${NAMESPACE}." >&2
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get svc >&2 || true
+  exit 1
+fi
+prom_port="$(
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${prom_svc}" \
+    -o jsonpath='{.spec.ports[0].port}'
+)"
+for service in opensearch flagd; do
+  if ! kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${service}" >/dev/null 2>&1; then
+    echo "Service ${service} is missing from namespace ${NAMESPACE}." >&2
+    exit 1
+  fi
+done
+
+tool_ports=(9090 9200 4000 8016)
+listening=0
+for port in "${tool_ports[@]}"; do
+  if lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    listening=$((listening + 1))
+  fi
+done
+if (( listening == ${#tool_ports[@]} )); then
+  echo "Tool endpoints are already listening on localhost."
+elif (( listening > 0 )); then
+  echo "Free ports 9090, 9200, 4000, and 8016, then run this script again." >&2
+  exit 1
+else
+  shop_pid="$(
+    KUBE_CONTEXT="${KUBE_CONTEXT}" NAMESPACE="${NAMESPACE}" ROOT="${ROOT}" \
+      SHOP_FORWARDS="${prom_svc}=9090:${prom_port},opensearch=9200:9200,flagd=4000:4000,flagd=8016:8016" \
+      python3 - <<'PY'
+import os
+
+pid = os.fork()
+if pid > 0:
+    print(pid)
+    raise SystemExit(0)
+os.setsid()
+log = os.open(
+    "/tmp/oncall-shop-port-forward.log",
+    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+    0o644,
+)
+os.dup2(log, 1)
+os.dup2(log, 2)
+os.close(log)
+os.execvp(
+    "python3",
+    ["python3", os.path.join(os.environ["ROOT"], "deploy", "shop-port-forward.py")],
+)
+PY
+  )"
+  echo "${shop_pid}" >/tmp/oncall-shop-port-forward.pid
+fi
+
+tools_ready=0
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -fsS -m 2 "http://127.0.0.1:9090/-/ready" >/dev/null 2>&1 \
+    && curl -fsS -m 2 "http://127.0.0.1:9200/" >/dev/null 2>&1 \
+    && curl -fsS -m 2 "http://127.0.0.1:4000/api/read" >/dev/null 2>&1; then
+    tools_ready=1
+    break
+  fi
+  sleep 1
+done
+if (( tools_ready == 0 )); then
+  echo "Prometheus, OpenSearch, or flagd did not answer on localhost." >&2
+  tail -20 /tmp/oncall-shop-port-forward.log >&2 || true
+  exit 1
+fi
+
 echo
 echo "Astronomy Shop is up."
 echo "  Web store         http://localhost:${HOST_PORT}/"
@@ -245,8 +323,12 @@ echo "  Jaeger            http://localhost:${HOST_PORT}/jaeger/ui/"
 echo "  Feature flags     http://localhost:${HOST_PORT}/feature"
 echo "  Load generator    http://localhost:${HOST_PORT}/loadgen/"
 echo "  Incident console  http://localhost:${INCIDENT_PORT}/"
+echo "  Prometheus        http://localhost:9090/"
+echo "  OpenSearch        http://localhost:9200/"
+echo "  Flagd             http://localhost:4000/api/read"
 echo
-echo "A service whose error rate stays above 5% over 2 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "The copilot tools read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get pods

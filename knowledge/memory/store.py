@@ -28,26 +28,13 @@ class SQLiteIncidentStore:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(str(self.database_path)) as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS incidents (
-                    id TEXT PRIMARY KEY,
-                    service TEXT NOT NULL,
-                    symptom TEXT NOT NULL,
-                    root_cause TEXT NOT NULL,
-                    preconditions TEXT NOT NULL,
-                    lesson TEXT NOT NULL,
-                    fix TEXT NOT NULL,
-                    reviewed_by TEXT NOT NULL
-                )
-                """
-            )
+            _ensure_table(connection)
             connection.execute(
                 """
                 INSERT INTO incidents (
                     id, service, symptom, root_cause, preconditions,
-                    lesson, fix, reviewed_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    lesson, fix, reviewed_by, failure_family
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     incident.id,
@@ -58,6 +45,7 @@ class SQLiteIncidentStore:
                     incident.lesson,
                     incident.fix,
                     incident.reviewed_by,
+                    incident.failure_family,
                 ),
             )
 
@@ -67,24 +55,11 @@ class SQLiteIncidentStore:
             return []
 
         with sqlite3.connect(str(self.database_path)) as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS incidents (
-                    id TEXT PRIMARY KEY,
-                    service TEXT NOT NULL,
-                    symptom TEXT NOT NULL,
-                    root_cause TEXT NOT NULL,
-                    preconditions TEXT NOT NULL,
-                    lesson TEXT NOT NULL,
-                    fix TEXT NOT NULL,
-                    reviewed_by TEXT NOT NULL
-                )
-                """
-            )
+            _ensure_table(connection)
             rows = connection.execute(
                 """
                 SELECT id, service, symptom, root_cause, preconditions,
-                       lesson, fix, reviewed_by
+                       lesson, fix, reviewed_by, failure_family
                 FROM incidents
                 ORDER BY rowid
                 """
@@ -100,9 +75,32 @@ class SQLiteIncidentStore:
                 lesson=row[5],
                 fix=row[6],
                 reviewed_by=row[7],
+                failure_family=row[8] or "",
             )
             for row in rows
         ]
+
+
+def _ensure_table(connection: sqlite3.Connection) -> None:
+    """Create the incident table and add failure_family on databases saved earlier."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS incidents (
+            id TEXT PRIMARY KEY,
+            service TEXT NOT NULL,
+            symptom TEXT NOT NULL,
+            root_cause TEXT NOT NULL,
+            preconditions TEXT NOT NULL,
+            lesson TEXT NOT NULL,
+            fix TEXT NOT NULL,
+            reviewed_by TEXT NOT NULL,
+            failure_family TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(incidents)")}
+    if "failure_family" not in columns:
+        connection.execute("ALTER TABLE incidents ADD COLUMN failure_family TEXT NOT NULL DEFAULT ''")
 
 
 class MemoryStore:

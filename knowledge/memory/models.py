@@ -17,15 +17,18 @@ class Incident:
     lesson: str
     fix: str
     reviewed_by: str
+    failure_family: str = ""
     id: str = field(default_factory=lambda: str(uuid4()))
 
     def embedding_text(self) -> str:
         """Return the incident content used for semantic indexing."""
         preconditions = "; ".join(self.preconditions) or "None recorded"
+        family = self.failure_family or "unspecified"
         return (
             f"Service: {self.service}\n"
             f"Symptom: {self.symptom}\n"
             f"Root cause: {self.root_cause}\n"
+            f"Failure family: {family}\n"
             f"Preconditions: {preconditions}\n"
             f"Lesson: {self.lesson}\n"
             f"Fix: {self.fix}"
