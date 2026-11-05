@@ -35,7 +35,7 @@ class Settings:
 
     @property
     def ERROR_RATIO_WINDOW(self) -> str:
-        return os.environ.get("ERROR_RATIO_WINDOW", "2m")
+        return os.environ.get("ERROR_RATIO_WINDOW", "5m")
 
     def apply_ca_bundle_to_env(self) -> None:
         """Point TLS clients at COPILOT_CA_BUNDLE when the process has not set one."""

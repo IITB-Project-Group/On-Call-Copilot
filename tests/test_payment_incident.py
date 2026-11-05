@@ -37,7 +37,7 @@ class Telemetry:
         self.log_error = log_error
 
     def service_error_ratio(self, window):
-        assert window == "2m"
+        assert window == "5m"
         return Result(ok=self.ratio_ok, series=self.ratio_series)
 
     def get_traces(self, service):

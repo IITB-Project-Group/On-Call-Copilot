@@ -84,7 +84,7 @@ def test_settings_read_the_environment(monkeypatch):
     assert settings.OPENSEARCH_URL == "http://localhost:9200"
     assert settings.FLAGD_UI_URL == "http://localhost:4000"
     assert settings.DEFAULT_RANGE_WINDOW == "5m"
-    assert settings.ERROR_RATIO_WINDOW == "2m"
+    assert settings.ERROR_RATIO_WINDOW == "5m"
     settings.apply_ca_bundle_to_env()
     assert "SSL_CERT_FILE" not in os.environ
 
@@ -155,7 +155,7 @@ def test_error_ratio_matches_the_paging_rule_and_keeps_the_rate(monkeypatch):
 
     install(monkeypatch, handler)
     ratio = client.service_error_ratio()
-    explicit = client.service_error_ratio("5m")
+    explicit = client.service_error_ratio("2m")
     rate = client.service_error_rates()
     client.service_error_rates("2m")
     client.service_request_rates()
@@ -163,9 +163,9 @@ def test_error_ratio_matches_the_paging_rule_and_keeps_the_rate(monkeypatch):
 
     assert ratio.ok and ratio.series[0]["value"] == 0.4
     assert " / " in ratio.query
-    assert "[2m]" in ratio.query
+    assert "[5m]" in ratio.query
     assert "STATUS_CODE_ERROR" in ratio.query
-    assert "[5m]" in explicit.query
+    assert "[2m]" in explicit.query
     assert " / " not in rate.query
     assert "[5m]" in rate.query
     assert any("[2m]" in query and " / " not in query for query in seen)

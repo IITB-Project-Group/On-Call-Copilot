@@ -20,7 +20,7 @@ def run_payment_incident(alert: Alert, *, telemetry=None, knowledge=None) -> dic
     telemetry = _telemetry() if telemetry is None else telemetry
     knowledge = _knowledge() if knowledge is None else knowledge
     service = alert.service
-    ratio_result = telemetry.service_error_ratio("2m")
+    ratio_result = telemetry.service_error_ratio("5m")
     trace_result = telemetry.get_traces("payment")
     change_result = telemetry.recent_changes()
     log_result = telemetry.log_search("error", service="payment")
@@ -54,7 +54,7 @@ def run_payment_incident(alert: Alert, *, telemetry=None, knowledge=None) -> dic
 def verify_payment_incident(investigation: dict, *, telemetry=None) -> dict:
     """Re-read the error ratio. A ratio that stays high does not create another action."""
     telemetry = _telemetry() if telemetry is None else telemetry
-    result = telemetry.service_error_ratio("2m")
+    result = telemetry.service_error_ratio("5m")
     observed = _relevant_ratio(result, investigation["service"])
     recovered = bool(result.ok and observed is not None and observed <= RATIO_LIMIT)
     return {

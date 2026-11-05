@@ -327,7 +327,7 @@ echo "  Prometheus        http://localhost:9090/"
 echo "  OpenSearch        http://localhost:9200/"
 echo "  Flagd             http://localhost:4000/api/read"
 echo
-echo "A service whose error rate stays above 5% over 2 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
 echo "The copilot tools read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"

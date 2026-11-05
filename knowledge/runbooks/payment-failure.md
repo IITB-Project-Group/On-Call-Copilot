@@ -4,7 +4,7 @@ title: Payment service failures
 service: payment
 failure_family: payment_failure
 symptoms:
-  - Checkout error ratio stays above 5% for two minutes
+  - Checkout error rate remains above 5% for five minutes
   - Payment service errors appear in traces for failed checkouts
 fix: Disable the paymentFailure feature flag after engineer approval
 related_flag: paymentFailure
@@ -33,14 +33,14 @@ action: set_flag
 arguments:
   flag: paymentFailure
   variant: off
-expected_effect: Payment errors decrease and the 2-minute checkout error ratio returns below 5%.
+expected_effect: Payment errors decrease and the checkout error rate returns below 5%.
 ```
 
 The on-call engineer must approve this exact action and its arguments. Execute it through the approved operations tool only. Do not use a shell, `docker exec`, or an unreviewed action.
 
 ## Verify recovery
 
-After the action, read the 2-minute checkout error ratio again. Consider recovery verified when that ratio is at or below 5%. A ratio that stays above 5% is not recovery, and it does not authorize another action. Record the ratio and the flag state.
+After the action, read the five-minute checkout error rate again. Consider recovery verified when that rate is at or below 5%. A rate that stays above 5% is not recovery, and it does not authorize another action. Record the rate and the flag state.
 
 If the metrics do not improve, or worsen, do not claim recovery. Follow the incident workflow to roll back the action if appropriate, obtain approval for the rollback, and replan using the new evidence.
 
