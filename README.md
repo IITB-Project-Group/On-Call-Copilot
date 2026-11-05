@@ -47,8 +47,10 @@ On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports
 | Feature flags | http://localhost:8080/feature |
 | Load generator | http://localhost:8080/loadgen/ |
 | Incident console | http://localhost:8000/ |
+| Telemetry MCP | http://127.0.0.1:8012/mcp |
+| Runbooks MCP | http://127.0.0.1:8013/mcp |
 
-`up.sh` also starts the incident API. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time over five minutes and that stays true for one minute. Alertmanager posts each firing service to the API. The console lists open incidents and keeps approved and rejected ones on Closed. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
+`up.sh` starts the incident API, and it starts the telemetry and runbook MCP servers so an orchestrator can call the shop tools. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time over five minutes and that stays true for one minute. Alertmanager posts each firing service to the API. The console lists open incidents and keeps approved and rejected ones on Closed. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
 
 To fire the rule, set `paymentFailure` to `100%`, or turn on another flag that makes a service return errors, such as `aiRunawayAgent`. Leave the load generator running. Prometheus scrapes once a minute, so the rule reads the last five minutes and then waits one minute. One incident per service shows on the console after that. Refresh the console if it was already open; the list loads when the page opens.
 

@@ -80,7 +80,7 @@ def test_settings_read_the_environment(monkeypatch):
 
     assert settings.PROMETHEUS_URL == "http://localhost:9090"
     assert settings.JAEGER_URL == "http://localhost:8080"
-    assert settings.JAEGER_BASE_PATH == "/jaeger"
+    assert settings.JAEGER_BASE_PATH == "/jaeger/ui"
     assert settings.OPENSEARCH_URL == "http://localhost:9200"
     assert settings.FLAGD_UI_URL == "http://localhost:4000"
     assert settings.DEFAULT_RANGE_WINDOW == "5m"

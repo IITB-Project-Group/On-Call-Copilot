@@ -14,6 +14,8 @@ RELEASE="otel-demo"
 HOST_PORT="8080"
 NODE_PORT="30080"
 INCIDENT_PORT="8000"
+TELEMETRY_MCP_PORT="8012"
+RUNBOOKS_MCP_PORT="8013"
 WAIT_SECONDS="1200"
 HELM_REPO="https://open-telemetry.github.io/opentelemetry-helm-charts"
 KUBE_CONTEXT="kind-${CLUSTER_NAME}"
@@ -240,7 +242,7 @@ fi
 prom_svc="$(
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get svc -o name |
     sed 's|service/||' |
-    awk '/prometheus-server$/ { print; exit }'
+    awk '$0 == "prometheus" || $0 == "prometheus-server" || $0 ~ /-prometheus-server$/ { print; exit }'
 )"
 if [[ -z "${prom_svc}" ]]; then
   echo "No Prometheus server service in namespace ${NAMESPACE}." >&2
@@ -315,6 +317,115 @@ if (( tools_ready == 0 )); then
   exit 1
 fi
 
+python="${ROOT}/.venv/bin/python"
+if [[ ! -x "${python}" ]]; then
+  echo "The project virtualenv is missing, so the copilot MCP servers were not started." >&2
+  echo "Create it and install the project, then run this script again." >&2
+  exit 1
+fi
+if ! "${python}" -c 'import fastmcp' >/dev/null 2>&1; then
+  echo "fastmcp is not installed in ${python}, so the copilot MCP servers were not started." >&2
+  echo "Install the project into that virtualenv, then run this script again." >&2
+  exit 1
+fi
+
+start_mcp() {
+  local module="$1"
+  local port="$2"
+  local port_env="$3"
+  local pid_file="$4"
+  local log_file="$5"
+  if lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Copilot MCP ${module} is already listening on localhost:${port}."
+    return 0
+  fi
+  local pid
+  pid="$(
+    ROOT="${ROOT}" MODULE="${module}" PORT="${port}" PORT_ENV="${port_env}" \
+      LOG_FILE="${log_file}" PYTHON="${python}" \
+      python3 - <<'PY'
+import os
+
+pid = os.fork()
+if pid > 0:
+    print(pid)
+    raise SystemExit(0)
+os.setsid()
+log = os.open(os.environ["LOG_FILE"], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+os.dup2(log, 1)
+os.dup2(log, 2)
+os.close(log)
+root = os.environ["ROOT"]
+os.environ["PYTHONPATH"] = os.pathsep.join((root, os.path.join(root, "safety")))
+os.environ["MCP_TRANSPORT"] = "http"
+os.environ["MCP_HOST"] = "127.0.0.1"
+os.environ[os.environ["PORT_ENV"]] = os.environ["PORT"]
+os.environ.setdefault("JAEGER_BASE_PATH", "/jaeger/ui")
+python = os.environ["PYTHON"]
+module = os.environ["MODULE"]
+os.execv(python, [python, "-m", module])
+PY
+  )"
+  echo "${pid}" >"${pid_file}"
+}
+
+mcp_ready() {
+  "${python}" - "$1" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+port = sys.argv[1]
+body = json.dumps(
+    {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "up.sh", "version": "0"},
+        },
+    }
+).encode()
+request = urllib.request.Request(
+    f"http://127.0.0.1:{port}/mcp",
+    data=body,
+    method="POST",
+    headers={
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    },
+)
+try:
+    with urllib.request.urlopen(request, timeout=2) as response:
+        raise SystemExit(0 if response.status == 200 else 1)
+except (urllib.error.URLError, TimeoutError):
+    raise SystemExit(1)
+PY
+}
+
+start_mcp tools.telemetry.server "${TELEMETRY_MCP_PORT}" TELEMETRY_MCP_PORT \
+  /tmp/oncall-telemetry-mcp.pid /tmp/oncall-telemetry-mcp.log
+start_mcp tools.runbooks.server "${RUNBOOKS_MCP_PORT}" RUNBOOKS_MCP_PORT \
+  /tmp/oncall-runbooks-mcp.pid /tmp/oncall-runbooks-mcp.log
+
+mcp_servers_ready=0
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if mcp_ready "${TELEMETRY_MCP_PORT}" && mcp_ready "${RUNBOOKS_MCP_PORT}"; then
+    mcp_servers_ready=1
+    break
+  fi
+  sleep 1
+done
+if (( mcp_servers_ready == 0 )); then
+  echo "The copilot MCP servers did not answer on localhost." >&2
+  tail -20 /tmp/oncall-telemetry-mcp.log >&2 || true
+  tail -20 /tmp/oncall-runbooks-mcp.log >&2 || true
+  exit 1
+fi
+
 echo
 echo "Astronomy Shop is up."
 echo "  Web store         http://localhost:${HOST_PORT}/"
@@ -326,9 +437,11 @@ echo "  Incident console  http://localhost:${INCIDENT_PORT}/"
 echo "  Prometheus        http://localhost:9090/"
 echo "  OpenSearch        http://localhost:9200/"
 echo "  Flagd             http://localhost:4000/api/read"
+echo "  Telemetry MCP     http://127.0.0.1:${TELEMETRY_MCP_PORT}/mcp"
+echo "  Runbooks MCP      http://127.0.0.1:${RUNBOOKS_MCP_PORT}/mcp"
 echo
 echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
-echo "The copilot tools read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
+echo "The copilot MCP servers read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get pods

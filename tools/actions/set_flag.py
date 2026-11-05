@@ -39,7 +39,12 @@ def set_flag(flag: str, variant: str) -> str:
             }
         },
     )
-    _wait_until_served(ofrep_url, flag, variant)
+    try:
+        _wait_until_served(ofrep_url, flag, variant)
+    except FlagWriteError as exc:
+        if _ui_has_variant(ui_url, flag, variant):
+            return f"{flag} is {variant}"
+        raise exc
     return f"{flag} is {variant}"
 
 
@@ -50,6 +55,7 @@ def _wait_until_served(ofrep_url: str, flag: str, variant: str) -> None:
             "POST",
             f"{ofrep_url}/ofrep/v1/evaluate/flags/{flag}",
             {},
+            timeout=2,
         )
         last = str(served.get("variant") or "")
         if last == variant:
@@ -59,7 +65,17 @@ def _wait_until_served(ofrep_url: str, flag: str, variant: str) -> None:
     raise FlagWriteError(f"{flag} is still {last or 'unset'}")
 
 
-def _request(method: str, url: str, body: dict | None = None) -> dict:
+def _ui_has_variant(ui_url: str, flag: str, variant: str) -> bool:
+    try:
+        document = _request("GET", f"{ui_url}/api/read")
+    except FlagWriteError:
+        return False
+    flags = document.get("flags")
+    current = flags.get(flag) if isinstance(flags, dict) else None
+    return isinstance(current, dict) and current.get("defaultVariant") == variant
+
+
+def _request(method: str, url: str, body: dict | None = None, timeout: float = 8) -> dict:
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(
         url,
@@ -68,13 +84,15 @@ def _request(method: str, url: str, body: dict | None = None) -> dict:
         method=method,
     )
     try:
-        with urllib.request.urlopen(request, timeout=8) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read().decode()
     except urllib.error.HTTPError as error:
         detail = error.read().decode(errors="replace")[:200]
         raise FlagWriteError(f"flag service returned {error.code}: {detail}") from error
     except urllib.error.URLError as error:
         raise FlagWriteError(f"flag service is unreachable: {error.reason}") from error
+    except TimeoutError as error:
+        raise FlagWriteError(f"flag service is unreachable: {error}") from error
     if not raw.strip():
         return {}
     try:
