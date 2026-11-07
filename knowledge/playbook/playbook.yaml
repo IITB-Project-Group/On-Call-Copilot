@@ -1,0 +1,3 @@
+# Reviewed lessons from Reflexion on development cases. Frozen before held-out.
+# Empty until `python -m eval.reflexion` runs with a model and a person reviews the lessons.
+lessons: []

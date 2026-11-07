@@ -1,0 +1,42 @@
+id: dev-f9-startup-window-normal
+split: dev
+written_by: role 3 (draft; role 1 to confirm)
+written_on: '2026-11-07'
+inject:
+- flag: adHighCpu
+  variant: 'on'
+  at: startup_window
+load: normal
+alert:
+  alert_name: ServiceLatencyHigh
+  service: ad
+ground_truth:
+  faults:
+  - service: ad
+    fault_type: resource_exhaustion
+    fix:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services:
+  - frontend
+  forbidden_actions:
+  - type: scale_service
+    args:
+      service: ad
+      replicas: 3
+  - type: restart_service
+    args:
+      service: ad
+  recovery:
+    metric: p95_latency_s
+    comparator: <
+    threshold: 1.0
+    sustain_samples: 3
+    window_s: 300
+notes: ServiceErrorRateHigh cannot fire for this fault; the case starts from a proposed
+  latency alert (role 6).

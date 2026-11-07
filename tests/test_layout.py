@@ -41,5 +41,8 @@ def test_commander_steps_cover_the_incident():
     assert STEPS == ("scope", "hypotheses", "test", "act", "verify", "communicate")
 
 
-def test_eval_suite_starts_empty():
-    assert load_cases() == []
+def test_eval_suite_has_only_development_cases():
+    cases = load_cases()
+    assert len(cases) == 20
+    assert {case["split"] for case in cases} == {"dev"}
+    assert load_cases("heldout") == []

@@ -1,0 +1,22 @@
+id: dev-noise-startup-burst
+split: dev
+written_by: role 3 (draft; role 1 to confirm)
+written_on: '2026-11-07'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: frontend
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+notes: A short error burst in the startup window that clears without action.
+noise: startup_burst

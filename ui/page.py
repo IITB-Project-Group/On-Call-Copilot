@@ -186,6 +186,14 @@ PAGE = """<!DOCTYPE html>
         <ol id="events" class="events"></ol>
         <p class="kicker">Query checked</p>
         <pre id="expression"></pre>
+        <div id="agent" hidden>
+          <h2>Agent plan</h2>
+          <p id="plan-reason" class="meta"></p>
+          <ol id="plan" class="events"></ol>
+          <p class="kicker">Hypotheses, most likely first</p>
+          <ol id="hypotheses" class="events"></ol>
+          <p id="pending" class="meta"></p>
+        </div>
       </div>
     </section>
     <aside id="decision" class="decision" aria-label="Possible solution" hidden>
@@ -197,6 +205,8 @@ PAGE = """<!DOCTYPE html>
         <form id="decision-form">
           <label for="confirmation">Confirmation code</label>
           <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
+          <label for="approver">Approver</label>
+          <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
           <label for="command">Note</label>
           <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
           <div id="controls">
@@ -289,7 +299,35 @@ PAGE = """<!DOCTYPE html>
     }
 
     function writesFlag(incident) {
+      if (incident.agent) return Boolean(incident.agent.proposal);
       return incident.service === "checkout" || incident.service === "payment";
+    }
+
+    function listInto(node, rows) {
+      node.replaceChildren();
+      for (const text of rows) {
+        const item = document.createElement("li");
+        item.textContent = text;
+        node.appendChild(item);
+      }
+    }
+
+    function renderAgent(incident) {
+      const view = incident.agent;
+      const panel = document.querySelector("#agent");
+      panel.hidden = !view;
+      if (!view) return;
+      const plan = view.plan || {steps: [], focus: []};
+      document.querySelector("#plan-reason").textContent =
+        "Plan v" + (plan.version || 1) + " (focus: " + (plan.focus || []).join(", ") + "). " + (plan.reason || "");
+      listInto(document.querySelector("#plan"), (plan.steps || []).map((s) => s.name + ": " + s.status));
+      listInto(document.querySelector("#hypotheses"), (view.hypotheses || []).map(
+        (h) => h.rank + ". " + h.service + " " + h.fault_type + (h.flag ? " (" + h.flag + ")" : "") + ": " + h.status));
+      const pending = view.pending;
+      document.querySelector("#pending").textContent = view.error ? "Agent error: " + view.error :
+        pending ? "Waiting for you: " + (pending.kind === "action" ? "approve the exact command" :
+          pending.kind === "comms" ? "review the status notes (Approve publishes the external note)" :
+          "review the proposed lessons") : (view.running ? "Agent is working." : "Outcome: " + (view.outcome || ""));
     }
 
     function severityOf(incident) {
@@ -332,8 +370,10 @@ PAGE = """<!DOCTYPE html>
       effect.hidden = !flag;
       if (!flag) return;
       payload.replaceChildren();
-      const lines = ["set_flag", "flag: paymentFailure", "value: off"];
-      if (incident.proposed_command) lines.push(incident.proposed_command);
+      const proposal = incident.agent && incident.agent.proposal;
+      const lines = proposal ? [proposal.command, "rollback: " + proposal.rollback_command, "severity: " + proposal.severity]
+        : ["set_flag", "flag: paymentFailure", "value: off"];
+      if (incident.proposed_command && !proposal) lines.push(incident.proposed_command);
       if (incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
       for (const line of lines) {
         const row = document.createElement("div");
@@ -365,6 +405,7 @@ PAGE = """<!DOCTYPE html>
     }
 
     function show(incident) {
+      renderAgent(incident);
       const open = isOpen(incident);
       shell.classList.add("has-incident");
       stream.hidden = false;
@@ -506,7 +547,8 @@ PAGE = """<!DOCTYPE html>
           body: JSON.stringify({
             decision: decisionName,
             text: command.value,
-            confirmation: confirmation.value
+            confirmation: confirmation.value,
+            approver: document.querySelector("#approver").value || "oncall"
           })
         });
         if (!response.ok) {

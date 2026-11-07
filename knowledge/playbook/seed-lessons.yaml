@@ -1,0 +1,97 @@
+# Seed lessons for the LangGraph lesson store, converted from the postmortems in
+# knowledge/postmortems. Preconditions use the observation keys the agent tools record
+# (agents/toolbox.py: record_observations). The conversion is role 3's draft; role 2 owns the
+# postmortems and confirms each conversion before the held-out run.
+#
+# pm-006 is the misleading-lesson case: it looks relevant to any ad latency incident, but it
+# applies only when ad CPU is saturated. On an adManualGc incident (GC pauses, CPU below 0.9)
+# or a payment incident (pm-010) its preconditions fail and recall rejects it.
+lessons:
+  - id: pm-001
+    service: payment
+    fault_type: error_injection
+    lesson: Payment-service errors are usually caused by the paymentFailure flag when trace evidence and flag state match.
+    applies_when: payment errors above 5% and paymentFailure is on
+    preconditions:
+      error_ratio.payment: {op: gte, value: 0.05}
+      flag.paymentFailure: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/payment-flag-incident.md
+  - id: pm-002
+    service: cart
+    fault_type: error_injection
+    lesson: Cart errors are strongly linked to the cartFailure flag when cart traces and recent flag changes align.
+    applies_when: cart errors above 5% and cartFailure is on
+    preconditions:
+      error_ratio.cart: {op: gte, value: 0.05}
+      flag.cartFailure: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/cart-flag-incident.md
+  - id: pm-003
+    service: product-catalog
+    fault_type: error_injection
+    lesson: Catalog read failures resolve when productCatalogFailure is switched off and the catalog is confirmed as the failing dependency.
+    applies_when: product-catalog errors and productCatalogFailure is on
+    preconditions:
+      error_ratio.product-catalog: {op: gte, value: 0.02}
+      flag.productCatalogFailure: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/product-catalog-incident.md
+  - id: pm-004
+    service: recommendation
+    fault_type: memory_leak
+    lesson: Recommendation cache degradation recovers when the cache failure flag is switched off, if the cache is the failing component.
+    applies_when: recommendation memory grows and recommendationCacheFailure is on
+    preconditions:
+      memory_growth.recommendation: {op: gte, value: 0.1}
+      flag.recommendationCacheFailure: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/recommendation-cache-incident.md
+  - id: pm-005
+    service: kafka
+    fault_type: queue_backlog
+    lesson: Kafka queue problems are likely when consumer lag and the asynchronous backlog rise together.
+    applies_when: accounting consumer lag is high and kafkaQueueProblems is on
+    preconditions:
+      kafka_lag.accounting: {op: gte, value: 1000}
+      flag.kafkaQueueProblems: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/kafka-backlog-incident.md
+  - id: pm-006
+    service: ad
+    fault_type: resource_exhaustion
+    lesson: High ad latency is a consequence of the adHighCpu flag when the ad container's CPU is saturated.
+    applies_when: ad CPU at or above 90% of its limit and adHighCpu is on
+    preconditions:
+      cpu_ratio.ad: {op: gte, value: 0.9}
+      flag.adHighCpu: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/ad-cpu-incident.md
+  - id: pm-007
+    service: email
+    fault_type: memory_leak
+    lesson: Email memory leaks are likely when sustained memory growth matches the active flag; a restart alone only hides it.
+    applies_when: email memory grows steadily and emailMemoryLeak is on
+    preconditions:
+      memory_growth.email: {op: gte, value: 0.1}
+      flag.emailMemoryLeak: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/email-memory-leak-incident.md
+  - id: pm-008
+    service: image-provider
+    fault_type: latency
+    lesson: Slow image loads are a flag issue when image-provider latency and page latency are both high.
+    applies_when: image-provider p95 above 1 s and imageSlowLoad is on
+    preconditions:
+      p95_latency_s.image-provider: {op: gte, value: 1.0}
+      flag.imageSlowLoad: {op: eq, value: true}
+    reviewed_by: seed-postmortem-owner
+    created_at: "2026-10-20T00:00:00+00:00"
+    source: knowledge/postmortems/image-latency-incident.md

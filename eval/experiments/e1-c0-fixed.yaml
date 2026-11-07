@@ -1,0 +1,9 @@
+# E1, C0: fixed workflow. No model decides anything; same tools, hooks and budget as C1 and C2.
+name: e1-c0-fixed
+architecture: c0
+parallel: false
+memory: false
+budget: 10
+learn: false
+repeats: 3
+notes: Baseline for "does the team justify its cost?"

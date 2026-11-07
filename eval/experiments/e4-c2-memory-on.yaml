@@ -1,0 +1,9 @@
+# E4 signature ablation: postmortem memory on (seed lessons, including the misleading pm-006 case).
+# Run with --budget 5, 10 and 20 for the tool-call budget arm.
+name: e4-c2-memory-on
+architecture: c2
+parallel: true
+memory: true
+budget: 10
+learn: false
+repeats: 3

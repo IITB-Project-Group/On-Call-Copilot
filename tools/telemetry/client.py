@@ -133,6 +133,30 @@ def get_traces(service: str, only_errors: bool = True, limit: int = 5) -> QueryR
             error=f"jaeger unavailable ({exc}); use metric-based diagnosis",
         )
 
+    spans = _jaeger_spans(data, only_errors)
+    return QueryResult(ok=True, query=f"traces({service})", series=spans[:limit])
+
+
+def get_trace(trace_id: str) -> QueryResult:
+    """Fetch every span of one trace. An unreachable Jaeger returns an unavailable result."""
+    url = f"{settings.JAEGER_URL}{settings.JAEGER_BASE_PATH}/api/traces/{trace_id}"
+    try:
+        with httpx.Client(timeout=15.0) as http:
+            response = http.get(url, params={})
+            if response.status_code != 200:
+                return QueryResult(
+                    ok=False,
+                    query=f"trace({trace_id})",
+                    error=f"jaeger unavailable (HTTP {response.status_code})",
+                )
+            data = response.json()
+    except Exception as exc:
+        return QueryResult(ok=False, query=f"trace({trace_id})", error=f"jaeger unavailable ({exc})")
+    return QueryResult(ok=True, query=f"trace({trace_id})", series=_jaeger_spans(data, only_errors=False))
+
+
+def _jaeger_spans(data: dict[str, Any], only_errors: bool) -> list[dict[str, Any]]:
+    """Flatten Jaeger traces. Ids and start times are kept so evidence can cite a span."""
     spans: list[dict[str, Any]] = []
     for trace in data.get("data", []):
         processes = {
@@ -140,21 +164,27 @@ def get_traces(service: str, only_errors: bool = True, limit: int = 5) -> QueryR
             for process_id, process in trace.get("processes", {}).items()
         }
         for span in trace.get("spans", []):
-            is_error = any(
-                tag.get("key") == "error" and str(tag.get("value")).lower() == "true"
-                for tag in span.get("tags", [])
-            )
+            tags = {tag.get("key"): tag.get("value") for tag in span.get("tags", [])}
+            is_error = str(tags.get("error")).lower() == "true"
             if only_errors and not is_error:
                 continue
+            parents = [
+                ref.get("spanID") for ref in span.get("references", []) if ref.get("refType") == "CHILD_OF"
+            ]
             spans.append(
                 {
                     "service": processes.get(span.get("processID")),
                     "operation": span.get("operationName"),
                     "duration_ms": round(span.get("duration", 0) / 1000.0, 2),
                     "error": is_error,
+                    "trace_id": str(span.get("traceID") or ""),
+                    "span_id": str(span.get("spanID") or ""),
+                    "parent_span_id": parents[0] if parents else None,
+                    "start_us": span.get("startTime"),
+                    "status_message": str(tags.get("otel.status_description") or "")[:200],
                 }
             )
-    return QueryResult(ok=True, query=f"traces({service})", series=spans[:limit])
+    return spans
 
 
 def recent_changes() -> QueryResult:

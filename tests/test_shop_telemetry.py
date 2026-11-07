@@ -293,7 +293,19 @@ def test_traces_keep_error_spans_and_survive_a_missing_jaeger(monkeypatch):
     install(monkeypatch, handler)
     errors = client.get_traces("payment", limit=1)
     assert errors.ok
-    assert errors.series == [{"service": "payment", "operation": "charge", "duration_ms": 2.5, "error": True}]
+    assert errors.series == [
+        {
+            "service": "payment",
+            "operation": "charge",
+            "duration_ms": 2.5,
+            "error": True,
+            "trace_id": "",
+            "span_id": "",
+            "parent_span_id": None,
+            "start_us": None,
+            "status_message": "",
+        }
+    ]
     mixed = client.get_traces("payment", only_errors=False)
     assert [item["operation"] for item in mixed.series] == ["charge", "ok", "bare"]
     assert mixed.series[2]["duration_ms"] == 0

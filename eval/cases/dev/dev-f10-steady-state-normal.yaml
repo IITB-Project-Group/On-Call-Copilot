@@ -1,0 +1,37 @@
+id: dev-f10-steady-state-normal
+split: dev
+written_by: role 3 (draft; role 1 to confirm)
+written_on: '2026-11-07'
+inject:
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: KafkaConsumerLagHigh
+  service: accounting
+ground_truth:
+  faults:
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV4
+  knock_on_services:
+  - fraud-detection
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: kafka_lag
+    comparator: <
+    threshold: 100
+    sustain_samples: 3
+    window_s: 300
+notes: Starts from a proposed consumer-lag alert (role 6). Checkout keeps working.

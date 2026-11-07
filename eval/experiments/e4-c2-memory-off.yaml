@@ -1,0 +1,8 @@
+# E4 signature ablation: postmortem memory off (no memory_search tool, no lessons in prompts).
+name: e4-c2-memory-off
+architecture: c2
+parallel: true
+memory: false
+budget: 10
+learn: false
+repeats: 3

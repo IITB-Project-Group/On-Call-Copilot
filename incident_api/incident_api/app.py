@@ -45,6 +45,7 @@ class DecisionBody(BaseModel):
     decision: str
     text: str = Field(default="")
     confirmation: str = Field(default="")
+    approver: str = Field(default="oncall")
 
 
 def default_db_path() -> str:
@@ -80,7 +81,7 @@ class SecurityHeaders:
         await self.app(scope, receive, send_with_headers)
 
 
-def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
+def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastAPI:
     chosen = db_path or default_db_path()
     change_flag = set_flag if on_approve is None else on_approve
     store = IncidentStore(chosen)
@@ -117,10 +118,17 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
     )
 
     gate = SafetyGate(change_flag, audit_path=str(Path(chosen).with_name("audit.jsonl")))
+    if agent is None and os.environ.get("COPILOT_AGENT"):
+        from graph.live import build_live_agent
+
+        agent = build_live_agent(store, gate, registry, chosen)
+    if agent is not None:
+        agent.resume_unfinished([incident["id"] for incident in store.list_incidents(state="open")])
     app = FastAPI(title="On-Call Copilot incident API")
     app.add_middleware(SecurityHeaders)
     app.state.store = store
     app.state.gate = gate
+    app.state.agent = agent
     app.state.alerts = AlertRateLimiter()
 
     @app.get("/healthz")
@@ -161,7 +169,10 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         created = []
         for alert in alerts:
             incident, is_new = store.create(**alert)
-            if is_new:
+            if is_new and agent is not None:
+                incidents_total.inc()
+                agent.start(incident["id"], {k: incident[k] for k in ("alert_name", "service", "starts_at")})
+            elif is_new:
                 incidents_total.inc()
                 proposal = gate.propose(incident["id"], incident["service"])
                 if proposal is not None:
@@ -183,6 +194,8 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         current = store.get(incident_id)
         if current is None:
             raise HTTPException(status_code=404, detail="incident not found")
+        if agent is not None and agent.handles(incident_id):
+            return _agent_decision(incident_id, current, body)
         flag_result = None
         if body.decision == "approve" and current["service"] in FLAG_SERVICES:
             outcome = gate.execute(incident_id, current.get("approval_request_id"), body.confirmation)
@@ -210,6 +223,33 @@ def create_app(db_path: str | None = None, on_approve=None) -> FastAPI:
         if flag_result is not None:
             updated = {**updated, "flag_result": flag_result}
         return updated
+
+    def _agent_decision(incident_id: str, current: dict, body: DecisionBody) -> dict:
+        """Resume the incident graph with the engineer's decision on whatever it is waiting for."""
+        pending = agent.pending(incident_id)
+        if pending is None:
+            raise HTTPException(status_code=409, detail="the agent is not waiting for a decision")
+        if body.decision == "edit" and not body.text.strip():
+            raise HTTPException(status_code=400, detail="edit requires text")
+        if pending["kind"] == "action" and body.decision == "approve":
+            if body.confirmation.strip().upper() != str(pending["confirmation_code"]).upper():
+                raise HTTPException(
+                    status_code=400, detail="Confirmation does not match the exact command shown"
+                )
+        agent.resume(
+            incident_id,
+            {
+                "decision": body.decision,
+                "approver": body.approver,
+                "text": body.text,
+                "confirmation": body.confirmation,
+                "comms_approver": body.approver,
+            },
+        )
+        updated = current
+        if pending["kind"] == "action" and body.decision in ("approve", "reject"):
+            updated = store.decide(incident_id, body.decision, body.text) or current
+        return {**updated, "agent": agent.view(incident_id)}
 
     @app.get("/incidents/{incident_id}/stream")
     async def stream(incident_id: str) -> StreamingResponse:
