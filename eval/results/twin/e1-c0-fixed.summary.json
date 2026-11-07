@@ -1,0 +1,20 @@
+{
+  "experiment": "e1-c0-fixed",
+  "runs": 60,
+  "errors": 0,
+  "success": 1.0,
+  "top1_service": 1.0,
+  "top3_service": 1.0,
+  "top1_fault": 1.0,
+  "top3_fault": 1.0,
+  "correct_action": 1.0,
+  "verified_recovery": 1.0,
+  "severity_correct": 0.9,
+  "harmful_actions": 0,
+  "unnecessary_actions": 0,
+  "blocked_proposals": 0,
+  "mean_tool_calls": 16.9,
+  "cost_usd_total": 0.0,
+  "latency_p50_s": 0.039,
+  "latency_p95_s": 0.051
+}
