@@ -33,7 +33,7 @@ class AgentContext:
             else max(2, min(budgets["react_max_steps"], budget + 2))
         )
         toolset = RoleToolset(
-            self.tools, role, self.available, context_max_chars=budgets["context_max_chars"]
+            self.tools, role, self.available, context_max_chars=budgets["context_max_chars"], budget=budget
         )
         if not (self.experiment.memory and self.lessons is not None):
             toolset.specs = [spec for spec in toolset.specs if spec.name != "memory_search"]

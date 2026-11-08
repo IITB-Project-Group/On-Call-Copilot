@@ -18,7 +18,7 @@ pricing:
   openai/gpt-4.1: {input_per_mtok: 2.0, output_per_mtok: 8.0}
   openai/gpt-4.1-mini: {input_per_mtok: 0.40, output_per_mtok: 1.60}
   openai/gpt-4o-mini: {input_per_mtok: 0.15, output_per_mtok: 0.60}
-  google/gemini-3.1-flash-lite: {input_per_mtok: 0.10, output_per_mtok: 0.40}
+  google/gemini-3.1-flash-lite: {input_per_mtok: 0.25, output_per_mtok: 1.50}
   default: {input_per_mtok: 3.0, output_per_mtok: 15.0}
 
 budgets:

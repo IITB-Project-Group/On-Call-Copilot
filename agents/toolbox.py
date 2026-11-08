@@ -108,10 +108,18 @@ class ToolUnavailable(RuntimeError):
 
 
 def parse_metric_query(query: str) -> tuple[str, str | None] | None:
+    """A copilot:* metric and optional service filter. A name without its window suffix
+    (``copilot:service_p95_latency_seconds``) resolves to the one catalogue metric it starts."""
     match = _QUERY.match(query or "")
-    if not match or match.group(1) not in METRICS:
+    if not match:
         return None
-    return match.group(1), match.group(2)
+    name = match.group(1)
+    if name not in METRICS:
+        candidates = [m for m in METRICS if m.startswith(name.rstrip(":") + ":")]
+        if len(candidates) != 1:
+            return None
+        name = candidates[0]
+    return name, match.group(2)
 
 
 def vector_response(name: str, values: dict[str, float], at: float = 0.0) -> dict:
@@ -704,12 +712,19 @@ class RoleToolset:
     """The tools one role may use, as model-facing schemas, routed through the hooks."""
 
     def __init__(
-        self, tools: IncidentTools, role: str, available: set[str], *, context_max_chars: int = 6000
+        self,
+        tools: IncidentTools,
+        role: str,
+        available: set[str],
+        *,
+        context_max_chars: int = 6000,
+        budget: int | None = None,
     ):
         allowed = ROLE_TOOL_ALLOWLIST.get(role, frozenset())
         self.tools, self.role = tools, role
         self.specs = [SPECS[name] for name in SPECS if name in allowed and name in available]
         self.context_max_chars = context_max_chars
+        self.budget, self.used = budget, 0
 
     def schemas(self) -> list[dict]:
         return [spec.schema() for spec in self.specs]
@@ -722,7 +737,12 @@ class RoleToolset:
             hook_args = spec.to_hook(dict(args or {}))
         except (TypeError, ValueError) as exc:
             return json.dumps({"error": f"bad arguments: {exc}"})
+        cached = sha256_hex(canonical_json([name, hook_args])) in self.tools.cache
+        if not cached and self.budget is not None and self.used >= self.budget:
+            # Refused here, not by the hooks: repeated hook refusals would halt the whole incident.
+            return json.dumps({"error": "your tool budget is used up; call submit now with what you have"})
         ok, result, reason = self.tools.call(self.role, name, hook_args)
+        self.used += 0 if cached else 1
         if not ok:
             return json.dumps({"error": reason or "tool call refused"})
         return _summarise(result, self.context_max_chars // 2)

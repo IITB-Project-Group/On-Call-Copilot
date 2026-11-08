@@ -240,3 +240,18 @@ def test_remaining_runner_twin_and_report_branches(tmp_path):
         encoding="utf-8",
     )
     assert "Plan v1" in trace_report.render(path)
+
+
+def test_short_metric_names_resolve_and_spent_budgets_are_refused_before_the_hooks():
+    from agents.toolbox import parse_metric_query
+
+    assert parse_metric_query('copilot:service_p95_latency_seconds{service="ad"}') == (
+        "copilot:service_p95_latency_seconds:2m",
+        "ad",
+    )
+    assert parse_metric_query("copilot:service") is None  # ambiguous: several metrics start with it
+    tools = IncidentTools(executor({"promql_query": lambda query, time=None: {}}), "i")
+    toolset = RoleToolset(tools, "triage", {"promql_query"}, budget=1)
+    toolset.call("promql_query", {"query": "up"})
+    assert "budget is used up" in toolset.call("promql_query", {"query": "down"})
+    assert tools.executor.mgr.state("i").blocked_attempts == 0

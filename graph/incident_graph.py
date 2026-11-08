@@ -222,8 +222,8 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
             report.suspects + state.get("suspects", []), state["alert"].get("service", "")
         )
         trace(state, "triage", report=report.model_dump(), suspects=suspects)
-        s(state).tools.call(
-            "triage",
+        s(state).tools.call(  # bookkeeping, as the commander, so it does not spend triage's budget
+            "commander",
             "incident_record_update",
             {
                 "incident_id": state["incident_id"],
@@ -247,10 +247,15 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
         groups = [[svc] for svc in suspects] if deps.experiment.parallel else [suspects]
         base = {k: state[k] for k in ("incident_id", "alert", "triage", "round") if k in state}
         base["contradiction"] = state.get("contradiction", "")
-        return [Send("diagnose", {**base, "assignment": group, "groups": len(groups)}) for group in groups]
+        return [
+            Send("diagnose", {**base, "assignment": group, "groups": len(groups), "index": i})
+            for i, group in enumerate(groups)
+        ]
 
     def diagnose(task):
-        share = max(1, budgets["diagnosis"] // task.get("groups", 1))
+        # Split the diagnosis budget; the remainder goes to the most likely suspects (5 over 3 is 2, 2, 1).
+        whole, extra = divmod(budgets["diagnosis"], task.get("groups", 1))
+        share = max(1, whole + (1 if task.get("index", 0) < extra else 0))
         report = run_diagnosis(
             deps.session(task["incident_id"]).ctx,
             task["alert"],
@@ -659,14 +664,20 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
                 },
             )
         sess.executor.mgr.mark(state["incident_id"], "recovered")
-        key = _key(proposal["hypothesis"])
+        # Hypotheses that blame the flag just fixed are the same root cause seen from another service.
+        fixed_flag = proposal["action"]["args"].get("flag")
+        hypotheses = state["diagnosis"]["hypotheses"]
+        resolved_now = sorted(
+            {_key(proposal["hypothesis"])}
+            | {_key(h) for h in hypotheses if fixed_flag and h.get("flag") == fixed_flag}
+        )
         remaining = [
             h
-            for h in state["diagnosis"]["hypotheses"]
+            for h in hypotheses
             if h["status"] == "supported"
-            and _key(h) != key
+            and _key(h) not in resolved_now
             and _key(h) not in state.get("resolved", [])
-            and h["service"] != proposal["hypothesis"]["service"]
+            and (h.get("flag") or h["service"] != proposal["hypothesis"]["service"])
         ]
         actions = sum(1 for p in state.get("proposals", []) if not p.get("blocked"))
         nxt = "propose" if remaining and actions < cfg["budgets"]["max_actions"] else "communicate"
@@ -674,7 +685,7 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
             state,
             {
                 "verification": verification,
-                "resolved": [key],
+                "resolved": resolved_now,
                 "next": nxt,
                 "outcome": "resolved",
                 "events": [_event(f"Verified recovery: {effect['metric']} {samples}")],
