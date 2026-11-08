@@ -13,8 +13,8 @@ This document explains how the incident graph, the commander and the specialists
 **What has and has not been run.**
 
 - **Built and tested:** the code is complete and tested, with 100% line and branch coverage. Every path also runs offline against the shop twin.
-- **Not yet run with a real model:** there was no OpenRouter key in the build environment. The team (C2) and single-agent (C1) results, Reflexion lessons and the real-model traces still need that run. The commands are below.
-- **Real results so far:** only the fixed workflow (C0), which needs no model.
+- **Run with a real model:** E1 and E4 ran on the 20 development cases against the shop twin (160 model runs, OpenRouter), and Reflexion drafted lessons from the failures. Results are in [evaluation.md](evaluation.md).
+- **Still to do:** a person reviews the lesson drafts and freezes the playbook; role 5 runs the held-out cases on the live shop.
 - **Scripted-model traces:** these are labelled as mechanism checks. They are not model results.
 
 ## 1. Architecture
@@ -228,12 +228,12 @@ python scripts/agent_evidence.py
 | Stop-and-resume demo (L8) | [traces/stop-and-resume.md](traces/stop-and-resume.md), [console](traces/stop-and-resume-console.txt) | Done (C0 on the twin) |
 | Self-correction loop | [traces/failed-fix-rollback.md](traces/failed-fix-rollback.md) | Done (C0) |
 | Edit cancels approval (L14) | [traces/edit-cancels-approval.md](traces/edit-cancels-approval.md) | Done (C0) |
-| Replan trace (L10), wrong first hypothesis (signature A) | [traces/wrong-first-hypothesis-scripted.md](traces/wrong-first-hypothesis-scripted.md) | Mechanism only (scripted model); real-model trace pending the key |
+| Replan trace (L10), wrong first hypothesis (signature A) | [traces/replan-real-model.md](traces/replan-real-model.md) (real model); [traces/wrong-first-hypothesis-scripted.md](traces/wrong-first-hypothesis-scripted.md) (mechanism check) | Done |
 | Failed tool, missing evidence | [traces/failed-tool.md](traces/failed-tool.md), [traces/missing-evidence-scripted.md](traces/missing-evidence-scripted.md) | Done (C0 / scripted) |
 | Log-borne "restart every service" (demo 2) | [traces/guardrails-and-lessons.json](traces/guardrails-and-lessons.json): the log line is quarantined, and a restart-all plan is refused with `wildcard_target` | Done |
 | Misleading lesson rejected (demo 3, E4) | Same file: pm-006 rejected, because `cpu_ratio.ad` is 0.25 (needs ≥ 0.9) and adHighCpu is off | Done |
-| Single vs team (L11, E1) | [evaluation.md](evaluation.md) | C0 done; C1 and C2 pending the key |
-| Playbook before/after (L12, E3) and a rejected Reflexion lesson | [playbook.md](playbook.md) | Pipeline done; lessons pending the key |
+| Single vs team (L11, E1) | [evaluation.md](evaluation.md) section 3 | Done on the development cases (twin); held-out runs are role 5's |
+| Playbook before/after (L12, E3) and a rejected Reflexion lesson | [playbook.md](playbook.md), `eval/reflexion/` | Lesson drafts done; human review and freeze pending, then role 5's held-out before/after |
 | Agent metrics for Grafana and alerts (L16) | `copilot_agent_*` metrics on `/metrics`; [../../deploy/agent-alert-rules.yaml](../../deploy/agent-alert-rules.yaml) | Done |
 
 ## 6. Code map

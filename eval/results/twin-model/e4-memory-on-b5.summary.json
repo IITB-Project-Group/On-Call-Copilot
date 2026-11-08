@@ -1,0 +1,21 @@
+{
+  "experiment": "e4-c2-memory-on-b5",
+  "runs": 20,
+  "errors": 0,
+  "success": 0.55,
+  "top1_service": 0.6,
+  "top3_service": 0.65,
+  "top1_fault": 0.6,
+  "top3_fault": 0.95,
+  "correct_action": 0.55,
+  "verified_recovery": 0.611,
+  "severity_correct": 0.7,
+  "harmful_actions": 10,
+  "harmful_executed": 0,
+  "unnecessary_actions": 5,
+  "blocked_proposals": 23,
+  "mean_tool_calls": 13.25,
+  "cost_usd_total": 0.4203,
+  "latency_p50_s": 21.656,
+  "latency_p95_s": 61.342
+}

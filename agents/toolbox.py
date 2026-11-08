@@ -617,6 +617,17 @@ def record_observations(tool: str, args: dict, result: Any, observations: dict) 
             observations[key] = sum(1 for s in spans if s.get("status") == "ERROR")
 
 
+OBSERVATION_METRICS = sorted({short for short, _ in METRICS.values()} | {"trace_errors"})
+_OBSERVATION_KEY = re.compile(r"^(?:(" + "|".join(OBSERVATION_METRICS) + r")\.[a-z][a-z-]*|flag\.[A-Za-z]+)$")
+
+
+def observable(key: str) -> bool:
+    """Whether a lesson precondition key is one the tools record (``cpu_ratio.ad``, ``flag.adHighCpu``)."""
+    if not _OBSERVATION_KEY.match(key or ""):
+        return False
+    return not key.startswith("flag.") or key[5:] in FAILURE_FLAGS
+
+
 def _summarise(result: Any, limit: int) -> str:
     text = result if isinstance(result, str) else json.dumps(_compact(result), default=str)
     return text if len(text) <= limit else text[:limit] + " ...[truncated]"

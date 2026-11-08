@@ -22,6 +22,7 @@ import yaml
 from output_guardrails import validate_memory_write
 
 from agents.memory.lessons import PLAYBOOK_DIR
+from agents.toolbox import observable
 
 PLAYBOOK = PLAYBOOK_DIR / "playbook.yaml"
 REJECTED = PLAYBOOK_DIR / "rejected.yaml"
@@ -72,8 +73,10 @@ def review(
         }
         if decision.lower() == "approve":
             check = validate_memory_write(lesson, frozen=False, incident_outcome="verified_failure")
-            if check.blocked:
-                results["invalid"].append({"id": item["id"], "codes": sorted(check.codes)})
+            unobservable = sorted(k for k in (draft.get("preconditions") or {}) if not observable(k))
+            if check.blocked or unobservable:
+                codes = sorted(check.codes) + (["unobservable_precondition"] if unobservable else [])
+                results["invalid"].append({"id": item["id"], "codes": codes, "keys": unobservable})
                 continue
             approved.append(lesson)
             results["approved"].append(item["id"])

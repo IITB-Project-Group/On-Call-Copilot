@@ -338,3 +338,30 @@ def test_resume_keeps_finished_rows_and_reruns_failed_ones(tmp_path):
         exp, [CASES["dev-f1-50pct"], CASES["dev-f3-50pct"]], out=out, repeats=1, resume=True
     )["rows"]
     assert rows[0]["marker"] == "kept" and rows[1]["error"] is None and rows[1]["success"]
+
+
+def test_lessons_must_use_observation_keys(tmp_path):
+    from agents.toolbox import observable
+    from eval import playbook
+
+    assert observable("error_ratio.checkout") and observable("flag.kafkaQueueProblems")
+    assert not observable('copilot:service_error_ratio:5m{service="checkout"}') and not observable(
+        "flag.nope"
+    )
+    draft = {
+        "service": "kafka",
+        "fault_type": "queue_backlog",
+        "lesson": "Switch the flag off.",
+        "applies_when": "consumer lag is high",
+        "preconditions": {"copilot:kafka_consumer_lag": {"op": "gt", "value": 1000}},
+    }
+    result = playbook.review(
+        [{"id": "l1", "case": "c", "draft": draft}],
+        {"l1": "approve"},
+        "dana",
+        playbook=tmp_path / "p.yaml",
+        rejected=tmp_path / "r.yaml",
+    )
+    assert result["invalid"] == [
+        {"id": "l1", "codes": ["unobservable_precondition"], "keys": ["copilot:kafka_consumer_lag"]}
+    ]

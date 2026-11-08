@@ -59,6 +59,6 @@ During incidents (not evaluation), the same review happens in the graph's `learn
 | Seed lessons with preconditions | Done (8); role 2 to confirm the conversions |
 | Precondition recall and rejection | Done and tested; pm-006 rejection shown above |
 | Reflexion pipeline, review, freeze, held-out guard | Done and tested with scripted models |
-| Playbook v1 lessons and a rejected Reflexion lesson | **Pending a real model run.** The commands are above. The rejected example will come from that review, not be invented |
+| Playbook v1 lessons and a rejected Reflexion lesson | **Drafts done; human review pending.** 7 drafts from the failed E1 team runs are in `eval/reflexion/pending.jsonl`. Suggested decisions (3 approve, 4 reject with reasons, for example pm-style "disable paymentFailure on payment errors" without a flag precondition, rejected as misleading) are in `eval/reflexion/decisions.yaml`. The reviewer confirms or changes each one, then runs review and freeze |
 
 Not converted: pm-009 names a service the shop does not have (inventory). pm-010 is itself the misleading-lesson scenario, which pm-006's rejection demonstrates.

@@ -33,14 +33,21 @@ Short answers to the questions the guide says every member must handle, for role
 - **Parallel diagnosis** tests several suspects at once within a shared budget.
 - **A stronger commander only where planning happens.**
 - **Typed hand-offs** let code check each stage.
-- **E1 measures whether this pays for its cost** against C1 (one agent, same tools and budget) and C0 (no model). Until the model runs are done, the honest answer is: here is the comparison set up, here is C0, and C1 and C2 are pending.
+- **E1 measures whether this pays for its cost** against C1 (one agent, same tools and budget) and C0 (no model).
+- **The honest answer from the development runs:** on the twin it did not yet pay. C0 1.00, C1 0.80, team 0.65, with 20 cases and one run each, so these differences are within noise.
+- **Where the team does well:** parallel diagnosis gives the best top-3 recall (0.90).
+- **Where it does badly:** no model setup closes a false alarm, and none fixes both faults of a pair.
+- **Where the team should earn its cost:** on held-out faults that break C0's rule (F2, F4). Role 5's held-out runs decide.
 
 **Show a replan.**
 
 - assess finds the top hypothesis refuted, for example because the flag it names is off.
 - The replan hook checks the limit.
 - The commander writes plan v2 with the contradiction as its reason, and diagnosis runs again.
-- Trace: traces/wrong-first-hypothesis-scripted.md (mechanism check). A real-model trace comes from the same command with the key set.
+- Trace: traces/replan-real-model.md (real model).
+  - The first plan led to proposing cartFailure off.
+  - The dry run showed it was already off, so the guardrails refused the plan.
+  - Plan v2 named that contradiction, and the team fixed paymentFailure, with verification holding for 3 samples.
 
 **How do you stop and resume?**
 

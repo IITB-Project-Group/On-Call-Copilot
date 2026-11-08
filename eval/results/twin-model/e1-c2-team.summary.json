@@ -1,0 +1,21 @@
+{
+  "experiment": "e1-c2-team",
+  "runs": 20,
+  "errors": 0,
+  "success": 0.65,
+  "top1_service": 0.7,
+  "top3_service": 0.9,
+  "top1_fault": 0.65,
+  "top3_fault": 0.9,
+  "correct_action": 0.7,
+  "verified_recovery": 0.722,
+  "severity_correct": 0.75,
+  "harmful_actions": 12,
+  "harmful_executed": 0,
+  "unnecessary_actions": 1,
+  "blocked_proposals": 16,
+  "mean_tool_calls": 18.55,
+  "cost_usd_total": 0.4028,
+  "latency_p50_s": 25.236,
+  "latency_p95_s": 64.628
+}

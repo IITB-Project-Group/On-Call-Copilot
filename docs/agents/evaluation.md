@@ -3,8 +3,8 @@
 | | |
 | --- | --- |
 | Owner | Role 3, with role 5, who owns the held-out cases and the final runs |
-| Status | Harness, configs and the C0 baseline done. Model runs (C1, C2, Reflexion) pending an OpenRouter key |
-| Results | `eval/results/twin/` (JSONL rows plus `.summary.json`) |
+| Status | Development runs done on the shop twin: C0, C1, C2, the single-investigator team, memory on/off × budgets 5/10/20, and Reflexion. Lessons await human review; held-out runs belong to role 5 |
+| Results | C0: `eval/results/twin/`. Model runs (config `2026-11-08.4`): `eval/results/twin-model/`, with traces. Earlier tuning iteration: `eval/results/twin-model-iter1/` |
 
 This is role 3's input to the evaluation report. It says what is measured, how, what has been run so far, and exactly what remains to run.
 
@@ -48,49 +48,87 @@ This is role 3's input to the evaluation report. It says what is measured, how, 
 | E3 | Does the reviewed playbook help on unseen incidents? | `e3-c2-no-playbook` vs `e3-c2-playbook` (frozen) | Reflexion and review on dev (playbook.md), then role 5 runs held-out with `--split heldout --cases-dir <role 5>` |
 | E4 | Does postmortem memory help, including the misleading lesson? What do budgets buy? | `e4-c2-memory-on` vs `e4-c2-memory-off`, each with `--budget 5`, `10` and `20` | `python -m eval.runner --experiment eval/experiments/e4-c2-memory-on.yaml --budget 5 --out ...` |
 
-## 3. Results so far
+## 3. Results on the development cases (shop twin)
 
-### C0 fixed workflow on the twin, development cases, 3 repeats (60 runs)
+**Setup.**
 
-Source: `eval/results/twin/e1-c0-fixed.summary.json`.
+- 20 development cases; one run per case per configuration.
+- Config `2026-11-08.4`.
+- Models: commander `openai/gpt-4.1`, specialists `openai/gpt-4.1-mini`, via OpenRouter.
+- Model runs: 160, with 0 errors after re-running the ones that failed during a network outage.
+- Spend for the batch: about $2.50, as reported by OpenRouter.
+- Sources: `eval/results/twin/e1-c0-fixed.*` and `eval/results/twin-model/*.summary.json`.
 
-| Metric | Value |
-| --- | --- |
-| Runs / errors | 60 / 0 |
-| Success | 1.00 |
-| Top-1 service / fault type | 1.00 / 1.00 |
-| Top-3 service / fault type | 1.00 / 1.00 |
-| Correct action proposed | 1.00 |
-| Verified recovery (fault cases) | 1.00 |
-| Severity matches the case | 0.90 |
-| Harmful / unnecessary actions | 0 / 0 |
-| Mean tool calls per incident | 16.9 (7 investigation reads, 1 runbook search, 1 dry run, 1 action, about 4 verification samples, 3 ticket writes; two-fault cases about 23) |
-| Model cost | 0 (no model) |
-| Latency p50 / p95 | 0.04 s / 0.05 s on the twin; not comparable with live runs |
+**How much these numbers can tell you.** With 20 cases and one run each, a difference of 1 to 3 cases (5 to 15 points) is within run-to-run variation. **None of the comparisons below is a reliable ranking.** They show where each design fails. Role 5's held-out runs, with 3 repeats each, are what the report should rank on.
 
-**What this shows, and its limits.**
+### E1: does the team justify its cost?
 
-- **Why C0 scores so high:** on the twin, C0 is close to an oracle for single-flag faults. Its rule reads the flag state, and on the development faults the active flag's service always shows the fault's signal.
-- **Why C0 is still useful:** it is the cost and latency floor that C1 and C2 must beat on harder cases.
-- **Where C0 is expected to fail.** Two held-out faults break its rule (predicted, not measured):
-  - F2 `paymentUnreachable`: payment shows no errors because no requests reach it.
-  - F4 `adManualGc`: the fault shares a service and fault type with F9.
-  - In both, an active flag's service does not show the signal the rule expects, so C0 can only escalate.
-- **Live differs from the twin.** On the live shop the telemetry is noisier than the twin's, and flagd reports no change times. The development numbers will not carry over unchanged.
-- **Two severity misses.** These are `dev-f10-startup-window-normal` and `dev-noise-startup-burst`.
-  - The twin's startup burst puts frontend at about 3% errors. Under the written policy that is SEV3 (any service at 1% or more), while the case files say SEV4.
-  - This is a case-design question for role 1: should startup-window noise count toward severity? It is recorded in the experiment log, and the cases were not changed to match.
+| Config | Success | Top-1 service / fault | Top-3 service / fault | Correct action | Verified recovery | Severity | Harmful proposed / executed | Blocked proposals | Tool calls | Model cost, 20 cases (USD) | Latency p50 / p95 (s) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| C0 fixed workflow | **1.00** | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 | 1.00 | 0.90 | 0 / 0 | 0 | 16.9 | 0 | 0.04 / 0.10 |
+| C1 single agent | 0.80 | 0.75 / 0.65 | 0.75 / 0.65 | 0.85 | 0.89 | 0.60 | 0 / 0 | 12 | 18.3 | 0.27 | 19 / 44 |
+| C2 team, one investigator | 0.75 | 0.65 / 0.70 | 0.70 / 0.85 | 0.80 | 0.83 | 0.60 | 9 / 0 | 11 | 18.6 | 0.30 | 27 / 58 |
+| C2 team, parallel diagnosis | 0.65 | 0.70 / 0.65 | 0.90 / 0.90 | 0.70 | 0.72 | 0.75 | 12 / 0 | 16 | 18.6 | 0.40 | 25 / 65 |
 
-### Pending (needs `OPENROUTER_API_KEY`)
+Model cost is the cost hook's estimate from token counts.
 
-| Run | Produces | Est. cost |
+**Where they fail** (successes per group of cases):
+
+| Config | F1 payment and pair F1+F9 | F3 cart and pair F3+F10 | F9 ad CPU | F10 Kafka | Noise |
+| --- | --- | --- | --- | --- | --- |
+| C0 | 5/5 | 5/5 | 4/4 | 4/4 | 2/2 |
+| C1 | 4/5 | 4/5 | 4/4 | 4/4 | 0/2 |
+| C2, one investigator | 3/5 | 4/5 | 4/4 | 4/4 | 0/2 |
+| C2, parallel | 3/5 | 4/5 | 4/4 | 2/4 | 0/2 |
+
+**What the results show.**
+
+1. **No model setup closes a false alarm.**
+   - On both noise cases every model configuration escalated to a person instead of closing with no action. That is safe, but costs an engineer's attention.
+   - C0's rule only acts when an active flag's service shows the matching signal, so it closes them.
+2. **Two faults at once.** The model setups usually fix the first fault and stop. Both pair cases count as failures in every model configuration.
+3. **Harmful proposals were all blocked; none were executed.** Harmful proposed / executed is 12 / 0 for the team.
+   - Every harmful proposal (restarting flagd, a protected service; switching a failure flag on) was refused by the guardrails or the dry run.
+   - The guide counts proposals, so they appear in the table.
+4. **The team does better at ranking, worse at the top choice.**
+   - Parallel diagnosis gives the best top-3 recall (0.90). Separate diagnosers each put their own suspect on the list.
+   - Its top-1 choice is no better than the single agent's. The merged list sometimes ranks a knock-on service first.
+   - That is what the guide asked us to test with "parallel diagnosis vs one investigator".
+5. **C0 is the cost and accuracy ceiling on the twin.** The twin makes the active flag visible and its effect clean, which suits C0's rule.
+   - As predicted, the held-out faults F2 (`paymentUnreachable`) and F4 (`adManualGc`) should break that rule. That is where the model setups are expected to earn their cost.
+   - This is a prediction, not a result.
+
+### E4: postmortem memory and tool budgets
+
+| Budget | Memory on | Memory off |
 | --- | --- | --- |
-| E1: C1, C2, C2 single investigator, on dev × 3 | Single vs team comparison; real replan and wrong-first-hypothesis traces | About 20 cases × 3 × 3 configs × about 15 model calls; under $10 at gpt-4.1-mini prices with the gpt-4.1 commander |
-| E4: memory on/off × budgets 5/10/20, on dev × 3 | Memory and budget ablation, including pm-006 rejection rates | Similar |
-| Reflexion on dev, then review and freeze | Playbook v1 and at least one rejected lesson | Small |
-| Held-out (role 5): C0, C1, C2 and E3 before/after, × 3 | The numbers for the report | Role 5 |
+| 5 | 0.55 (top-1 service 0.60, harmful proposed 10, cost 0.42) | 0.75 (0.70, 1, 0.32) |
+| 10 | 0.65 (0.70, 12, 0.40). The E1 team run | 0.70 (0.70, 1, 0.38) |
+| 20 | 0.65 (0.75, 5, 0.52) | 0.70 (0.75, 5, 0.49) |
 
-The cost cap hook (`max_cost_usd: 0.50` per incident) stops any single runaway run.
+Each cell is success, then in brackets top-1 service, harmful proposed and model cost for 20 cases in USD. Harmful executed was 0 everywhere.
+
+- **Memory on did not help on the development cases, and at budget 5 it hurt.**
+  - With a budget this small, the runbook specialist's `memory_search` call takes one of the few tool calls left for investigation.
+  - The seed lessons describe the same faults the agents already find. On these cases they add context but no new information.
+- **The misleading lesson.** The misleading-lesson test (pm-006 on an ad incident with normal CPU) is the held-out F4 case. On development cases pm-006's preconditions hold only for F9, where it is correct. In the traces, pm-006 was applied only in F9 cases, and every other seed lesson only in its own fault group (pm-001 on F1, pm-002 on F3, pm-005 on F10).
+- **Budget.** Going from 10 to 20 calls raised cost by about 30% and tool calls from about 19 to 26. Success did not change.
+
+### Iteration history
+
+`eval/results/twin-model-iter1/` holds the first model batch (configs `2026-11-08.1` and `.2`), before the fixes in the experiment log.
+
+- In that batch, C1 scored 0% on fault type: the hand-off schema allowed free text.
+- The team proposed switching a failure flag on, and restarts this deployment cannot execute.
+
+The jump from iteration 1 to the current numbers comes from tuning on the development cases. That is allowed, and every change is logged. **The held-out cases have not been seen.**
+
+### E3: playbook (Reflexion)
+
+- Reflexion reflected on the 7 failed team runs: `eval/reflexion/pending.jsonl`.
+- Suggested review decisions are in `eval/reflexion/decisions.yaml`: approve 3, reject 4, with reasons.
+- After a person reviews, run `python -m eval.playbook review ...` and then `freeze`.
+- Role 5 then runs `e3-c2-no-playbook` and `e3-c2-playbook` on the held-out cases.
 
 ## 4. Threats to validity
 

@@ -1,7 +1,7 @@
 # Agent configuration: models, budgets and prompts in one versioned file (L16).
 # Change `version` whenever a model, budget or prompt changes, and record the change in
 # docs/agents/experiment-log.md. Every run records this version and the exact model IDs.
-version: "2026-11-08.4"
+version: "2026-11-08.5"
 
 models:
   provider: openrouter
@@ -182,6 +182,8 @@ prompts:
     task: Write one short lesson that would have avoided this failure, and the observable conditions under which it applies.
     constraints:
       - Preconditions must be observable during an incident (metric readings or flag state), never the case id or the answer key.
+      - Each precondition key is exactly <reading>.<service> or flag.<flagName>. Readings - error_ratio, request_rate, p95_latency_s, cpu_ratio, memory_growth, kafka_lag, gc_pause_ratio, trace_errors. Examples - error_ratio.payment, kafka_lag.accounting, flag.kafkaQueueProblems. Never a PromQL query string.
+      - The service is the one where the fault originates, and the lesson must make the next run act correctly, not just escalate.
       - One lesson only. It will be reviewed by a person before use.
     format: Call submit with a LessonDraft.
     examples: |
