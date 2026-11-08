@@ -677,7 +677,7 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
             if h["status"] == "supported"
             and _key(h) not in resolved_now
             and _key(h) not in state.get("resolved", [])
-            and (h.get("flag") or h["service"] != proposal["hypothesis"]["service"])
+            and h.get("flag")  # only another flag is a second, actionable fault
         ]
         actions = sum(1 for p in state.get("proposals", []) if not p.get("blocked"))
         nxt = "propose" if remaining and actions < cfg["budgets"]["max_actions"] else "communicate"

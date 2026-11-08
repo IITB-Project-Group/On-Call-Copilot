@@ -1,7 +1,7 @@
 # Agent configuration: models, budgets and prompts in one versioned file (L16).
 # Change `version` whenever a model, budget or prompt changes, and record the change in
 # docs/agents/experiment-log.md. Every run records this version and the exact model IDs.
-version: "2026-11-07.1"
+version: "2026-11-08.1"
 
 models:
   provider: openrouter
@@ -26,9 +26,9 @@ budgets:
   investigation_tool_calls: 10
   # Share of the investigation budget per specialist in the team (C2).
   split: {triage: 0.3, diagnosis: 0.5, runbook: 0.2}
-  # Calls kept back for the dry run, the action and verification, so a small investigation
+  # Calls kept back for the dry runs, up to two actions, their verification and ticket writes, so a small investigation
   # budget never prevents verifying or rolling back. Rollbacks are exempt from budgets anyway.
-  action_reserve_tool_calls: 14
+  action_reserve_tool_calls: 20
   max_cost_usd: 0.50
   max_wall_clock_s: 1800
   max_replans: 3
@@ -112,7 +112,7 @@ prompts:
       Metric names: {metrics}
       Fault types: error_injection, dependency_unreachable, latency, resource_exhaustion, memory_leak, queue_backlog, traffic_surge, crash, hang, bad_deploy, config_error, no_fault.
       Flags that inject faults: {flags}
-    task: Form hypotheses (service, fault type, likely flag), gather evidence for and against each with the tools, and rank them. Mark a hypothesis refuted when the evidence contradicts it.
+    task: Form hypotheses (service, fault type, likely flag), gather evidence for and against each with the tools, and rank them. Mark a hypothesis refuted when the evidence contradicts it. Name the service where the fault originates (for a flag, the service it injects into), not a caller that only shows knock-on errors.
     constraints: *shared
     format: Call submit with a DiagnosisReport. Ranks are 1..n; supported outrank proposed, which outrank refuted. Give at least 3 hypotheses when you can.
     examples: |

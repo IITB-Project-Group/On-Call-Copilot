@@ -255,3 +255,21 @@ def test_short_metric_names_resolve_and_spent_budgets_are_refused_before_the_hoo
     toolset.call("promql_query", {"query": "up"})
     assert "budget is used up" in toolset.call("promql_query", {"query": "down"})
     assert tools.executor.mgr.state("i").blocked_attempts == 0
+
+
+def test_a_flag_hypothesis_is_located_in_the_flag_service():
+    from agents.diagnosis import locate
+    from agents.handoffs import Hypothesis
+
+    seen = Hypothesis(
+        id="a",
+        rank=1,
+        service="checkout",
+        fault_type="error_injection",
+        status="supported",
+        flag="paymentFailure",
+        rationale="errors on checkout",
+    )
+    moved = locate(seen)
+    assert moved.service == "payment" and moved.rationale.startswith("Located in payment")
+    assert locate(moved) == moved

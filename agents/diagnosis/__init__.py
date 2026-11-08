@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from output_guardrails import ROLE_TOOL_ALLOWLIST
 
-from agents.catalog import flags_text
+from guardrail_core import FLAG_SERVICE_MAP
+
+from agents.catalog import PRIMARY_SERVICE, flags_text
 from agents.context import AgentContext, alert_text, compact, metrics_text
 from agents.handoffs import DiagnosisReport, Hypothesis
 
@@ -54,11 +56,23 @@ def ground(hypotheses: list[Hypothesis], evidence: set[str]) -> list[Hypothesis]
     return out
 
 
+def locate(h: Hypothesis) -> Hypothesis:
+    """A flag injects its fault into its own service; errors elsewhere are knock-on effects.
+    A hypothesis that names a flag but another service is moved to the flag's service."""
+    services = FLAG_SERVICE_MAP.get(h.flag or "")
+    if not services or h.service in services:
+        return h
+    note = (
+        f"Located in {PRIMARY_SERVICE[h.flag]}: {h.flag} injects there; {h.service} shows knock-on errors. "
+    )
+    return h.model_copy(update={"service": PRIMARY_SERVICE[h.flag], "rationale": note + h.rationale})
+
+
 def merge(reports: list[DiagnosisReport], evidence: set[str]) -> dict:
     """One ranked hypothesis list from several diagnosers: supported first, duplicates merged."""
     best: dict[tuple, Hypothesis] = {}
     for report in reports:
-        for h in ground(report.hypotheses, evidence):
+        for h in map(locate, ground(report.hypotheses, evidence)):
             key = (h.service, h.fault_type, h.flag)
             old = best.get(key)
             if old is None or (STATUS_ORDER[h.status], h.rank) < (STATUS_ORDER[old.status], old.rank):

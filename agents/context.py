@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agents.react import ReactResult, run_react
-from agents.settings import Experiment, render_prompt
+from agents.settings import Experiment, render_prompt, role_budgets
 from agents.toolbox import METRICS, IncidentTools, RoleToolset
 
 
@@ -27,6 +27,10 @@ class AgentContext:
         self, role: str, prompt: str, values: dict, task: str, submit, budget: int | None = None
     ) -> ReactResult:
         budgets = self.config["budgets"]
+        cap = role_budgets(self.experiment, self.config).get(role)
+        if budget is not None and cap is not None:  # the hook's cap is per incident, across replans
+            spent = self.executor.mgr.state(self.incident_id).per_role.get(role, 0)
+            budget = max(0, min(budget, cap - spent))
         steps = (
             budgets["react_max_steps"]
             if budget is None
