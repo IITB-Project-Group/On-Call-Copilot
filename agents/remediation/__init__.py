@@ -14,7 +14,12 @@ from agents.handoffs import RemediationProposal
 
 
 def run_remediation(
-    ctx: AgentContext, hypothesis: dict, advice: dict, flags: dict, note: str = ""
+    ctx: AgentContext,
+    hypothesis: dict,
+    advice: dict,
+    flags: dict,
+    note: str = "",
+    executable: tuple[str, ...] = ("set_flag",),
 ) -> RemediationProposal | None:
     task = "Propose one action for the top hypothesis and submit a RemediationProposal."
     if note:
@@ -26,6 +31,7 @@ def run_remediation(
             "hypothesis": compact(hypothesis, 600),
             "advice": compact(advice, 800),
             "flags": compact(flags, 600),
+            "executable": ", ".join(executable),
         },
         task,
         RemediationProposal,

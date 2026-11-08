@@ -273,3 +273,43 @@ def test_a_flag_hypothesis_is_located_in_the_flag_service():
     moved = locate(seen)
     assert moved.service == "payment" and moved.rationale.startswith("Located in payment")
     assert locate(moved) == moved
+
+
+def test_schema_enums_match_the_safety_constants_and_fixes_are_complete():
+    import typing
+
+    from guardrail_core import FAILURE_FLAGS, FAULT_TAXONOMY
+    from pydantic import ValidationError
+
+    from agents.handoffs import ActionSpec, FaultType, FlagName
+
+    assert set(typing.get_args(FlagName)) == set(FAILURE_FLAGS)
+    assert set(typing.get_args(FaultType)) == set(FAULT_TAXONOMY)
+    for bad in (
+        {"type": "set_flag", "flag": "cartFailure", "enabled": True},
+        {"type": "set_flag", "enabled": False},
+    ):
+        with pytest.raises(ValidationError):
+            ActionSpec(**bad)
+
+
+def test_only_no_fault_hypotheses_count_as_a_no_fault_vote():
+    from agents.diagnosis import merge
+    from agents.handoffs import DiagnosisReport, Hypothesis
+
+    quiet = Hypothesis(
+        id="a", rank=1, service="cart", fault_type="no_fault", status="supported", evidence=["m:1"]
+    )
+    merged = merge([DiagnosisReport(hypotheses=[quiet])], {"m:1"})
+    assert merged == {"hypotheses": [], "no_fault": True, "evidence": ["m:1"]}
+
+
+def test_a_hypothesis_without_a_flag_is_linked_to_the_one_active_flag_that_fits():
+    from graph.incident_graph import link_flag
+
+    h = {"service": "accounting", "fault_type": "queue_backlog", "flag": None, "rationale": "lag"}
+    link_flag(h, {"flag.kafkaQueueProblems": True})
+    assert h["flag"] == "kafkaQueueProblems" and h["rationale"].startswith("Linked to kafkaQueueProblems")
+    other = {"service": "accounting", "fault_type": "latency", "flag": None}
+    link_flag(other, {"flag.kafkaQueueProblems": True})
+    assert other["flag"] is None

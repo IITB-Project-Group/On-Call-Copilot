@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Annotated, Any, TypedDict
 
-from guardrail_core import Decision
+from guardrail_core import FLAG_SERVICE_MAP, Decision
 from hooks import CostLimitHook, GuardedExecutor, HookManager, default_hooks
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send, interrupt
@@ -36,6 +36,7 @@ from output_guardrails import (
     verify_recovery,
 )
 
+from agents.catalog import FLAG_FAULT_TYPE
 from agents.comms import run_comms, template_draft
 from agents.context import AgentContext
 from agents.diagnosis import merge, run_diagnosis
@@ -322,6 +323,10 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
         diagnosis = merge(reports, evidence)
         resolved = set(state.get("resolved", []))
         obs = sess.tools.observations
+        if diagnosis["no_fault"] and not diagnosis.get("evidence"):  # evidence triage cited, if any
+            diagnosis["evidence"] = [e for e in state.get("triage", {}).get("evidence", []) if e in evidence]
+        for h in diagnosis["hypotheses"]:
+            link_flag(h, obs)
         for h in diagnosis["hypotheses"]:
             if h.get("flag") and obs.get(f"flag.{h['flag']}") is False and h["status"] == "supported":
                 h["status"], h["rationale"] = "refuted", f"{h['flag']} is off. " + h.get("rationale", "")
@@ -461,6 +466,7 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
                 state.get("runbook", {}),
                 {k: v for k, v in flags.items() if k.startswith("flag.")},
                 state.get("edit_note", ""),
+                tuple(a for a, tool in OPS_TOOL.items() if tool in deps.ops.tools()),
             )
             if proposal is not None:
                 action, rationale = proposal.action.to_action(), proposal.rationale
@@ -952,6 +958,26 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
 
 
 # ---------------------------------------------------------------------- helpers
+def link_flag(h: dict, observations: dict) -> None:
+    """Name the flag for a hypothesis that has none, when exactly one flag that is on injects that
+    fault type into that service (fault catalogue). The link is written into the rationale."""
+    if h.get("flag"):
+        return
+    linked = [
+        flag
+        for flag, fault in FLAG_FAULT_TYPE.items()
+        if fault == h["fault_type"]
+        and h["service"] in FLAG_SERVICE_MAP[flag]
+        and observations.get(f"flag.{flag}")
+    ]
+    if len(linked) == 1:
+        h["flag"] = linked[0]
+        h["rationale"] = (
+            f"Linked to {linked[0]}: it is on and injects {h['fault_type']} into {h['service']}. "
+            + h.get("rationale", "")
+        )
+
+
 def _key(h: dict) -> str:
     return f"{h.get('service')}/{h.get('fault_type')}/{h.get('flag')}"
 

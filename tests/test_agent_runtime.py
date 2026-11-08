@@ -178,8 +178,19 @@ def test_reflexion_writes_lessons_for_failed_development_cases(tmp_path):
     )
 
 
+def test_reflexion_reuses_an_earlier_run(tmp_path):
+    exp = Experiment(name="c2", architecture="c2", learn=False)
+    results = tmp_path / "r.jsonl"
+    row = {"case": "dev-f1-50pct", "repeat": 0, "success": False, "incident_id": None, "top_hypotheses": []}
+    results.write_text("\n".join(json.dumps(r) for r in (row, {**row, "repeat": 1})), encoding="utf-8")
+    pending = reflexion.run_reflexion(
+        exp, [CASES["dev-f1-50pct"]], tmp_path, models=S.models(exp), results=results, traces_dir=tmp_path
+    )
+    assert pending[0]["case"] == "dev-f1-50pct" and pending[0]["draft"]
+
+
 def test_reflexion_main(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(reflexion, "run_reflexion", lambda exp, cases, out: [{"id": "x"}])
+    monkeypatch.setattr(reflexion, "run_reflexion", lambda exp, cases, out, **kw: [{"id": "x"}])
     assert (
         reflexion.main(["--experiment", "eval/experiments/e3-c2-no-playbook.yaml", "--out", str(tmp_path)])
         == 0

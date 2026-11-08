@@ -1,0 +1,20 @@
+{
+  "experiment": "e1-c2-single-investigator",
+  "runs": 20,
+  "errors": 0,
+  "success": 0.4,
+  "top1_service": 0.7,
+  "top3_service": 0.7,
+  "top1_fault": 0.85,
+  "top3_fault": 0.85,
+  "correct_action": 0.5,
+  "verified_recovery": 0.5,
+  "severity_correct": 0.7,
+  "harmful_actions": 15,
+  "unnecessary_actions": 11,
+  "blocked_proposals": 26,
+  "mean_tool_calls": 17,
+  "cost_usd_total": 0.3732,
+  "latency_p50_s": 37.268,
+  "latency_p95_s": 55.456
+}

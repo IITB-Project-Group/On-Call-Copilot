@@ -105,17 +105,29 @@ def reflect(feedback: str, steps: str, models, config: dict) -> LessonDraft | No
 
 
 def run_reflexion(
-    experiment: Experiment, cases: list[dict], out_dir: str | Path, *, models=None
+    experiment: Experiment,
+    cases: list[dict],
+    out_dir: str | Path,
+    *,
+    models=None,
+    results: str | Path | None = None,
+    traces_dir: str | Path | None = None,
 ) -> list[dict]:
+    """Reflect on each failed development case. With ``results`` (a runner JSONL and its traces),
+    the cases already run are reused instead of being run again."""
     if any(case["split"] != "dev" for case in cases):
         raise ValueError("Reflexion runs on development cases only")
     config = load_config()
     out = Path(out_dir)
-    traces = out / "traces"
+    traces = Path(traces_dir) if traces_dir else out / "traces"
     models = models or ModelFactory(experiment, config)
+    done = {}
+    if results:
+        rows = [json.loads(line) for line in Path(results).read_text(encoding="utf-8").splitlines() if line]
+        done = {row["case"]: row for row in rows if row.get("repeat", 0) == 0}
     pending = []
     for case in cases:
-        row = run_case(case, experiment, models=models, traces_dir=str(traces))
+        row = done.get(case["id"]) or run_case(case, experiment, models=models, traces_dir=str(traces))
         if row.get("success"):
             continue
         feedback = feedback_for(case, row)
@@ -138,8 +150,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Reflexion on development cases")
     parser.add_argument("--experiment", required=True)
     parser.add_argument("--out", default="eval/reflexion")
+    parser.add_argument("--results", help="Reuse a runner JSONL on the dev split instead of re-running it.")
+    parser.add_argument("--traces", help="Trace directory of that run.")
     args = parser.parse_args(argv)
-    pending = run_reflexion(load_experiment(args.experiment), load_cases("dev"), args.out)
+    pending = run_reflexion(
+        load_experiment(args.experiment),
+        load_cases("dev"),
+        args.out,
+        results=args.results,
+        traces_dir=args.traces,
+    )
     print(f"{len(pending)} lesson(s) waiting for review in {args.out}/pending.jsonl")
     return 0
 

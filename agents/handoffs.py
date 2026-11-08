@@ -8,11 +8,41 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 STEP_NAMES = ("triage", "diagnose", "runbook", "propose", "approve", "act", "verify", "communicate", "learn")
 HypothesisStatus = Literal["supported", "proposed", "inconclusive", "refuted"]
 ActionType = Literal["set_flag", "restart_service", "scale_service", "rollback_deploy"]
+# The failure flags in safety/guardrail_core.py (FLAG_SERVICE_MAP); a model cannot name a flag that does not exist.
+FlagName = Literal[
+    "paymentFailure",
+    "paymentUnreachable",
+    "cartFailure",
+    "productCatalogFailure",
+    "recommendationCacheFailure",
+    "kafkaQueueProblems",
+    "adHighCpu",
+    "adFailure",
+    "adManualGc",
+    "emailMemoryLeak",
+    "imageSlowLoad",
+    "loadGeneratorFloodHomepage",
+]
+# The fault taxonomy in safety/guardrail_core.py, as a schema enum so a model cannot invent a category.
+FaultType = Literal[
+    "error_injection",
+    "bad_deploy",
+    "crash",
+    "hang",
+    "latency",
+    "resource_exhaustion",
+    "memory_leak",
+    "queue_backlog",
+    "dependency_unreachable",
+    "traffic_surge",
+    "config_error",
+    "no_fault",
+]
 
 
 class PlanStep(BaseModel):
@@ -62,12 +92,12 @@ class Hypothesis(BaseModel):
     id: str
     rank: int
     service: str
-    fault_type: str
+    fault_type: FaultType
     status: HypothesisStatus
     evidence: list[str] = Field(
         default_factory=list, description="evidence_id values that support or refute it."
     )
-    flag: str | None = Field(default=None, description="The feature flag that would cause this, if any.")
+    flag: FlagName | None = Field(default=None, description="The feature flag that would cause this, if any.")
     rationale: str = ""
 
 
@@ -83,11 +113,20 @@ class ActionSpec(BaseModel):
     """One allow-listed action with typed arguments. Free-form commands cannot be expressed."""
 
     type: ActionType
-    flag: str | None = None
-    enabled: bool | None = None
+    flag: FlagName | None = None
+    enabled: bool | None = Field(
+        default=None,
+        description="set_flag only: false switches the failure flag off, which is the fix. Never true.",
+    )
     service: str | None = None
     replicas: int | None = None
     to_version: str | None = None
+
+    @model_validator(mode="after")
+    def _flag_fix_is_complete(self) -> ActionSpec:
+        if self.type == "set_flag" and (not self.flag or self.enabled is not False):
+            raise ValueError("set_flag needs the flag name and enabled: false (switching it off is the fix)")
+        return self
 
     def to_action(self) -> dict:
         keys = {
@@ -131,7 +170,7 @@ class LessonDraft(BaseModel):
     the tools record, for example ``cpu_ratio.ad`` or ``flag.adHighCpu``."""
 
     service: str
-    fault_type: str
+    fault_type: FaultType
     lesson: str
     preconditions: dict[str, dict] = Field(
         description='Map of observation key to {"op": eq|ne|in|not_in|gt|gte|lt|lte, "value": ...}.'

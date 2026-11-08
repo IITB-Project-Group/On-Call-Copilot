@@ -68,11 +68,20 @@ def locate(h: Hypothesis) -> Hypothesis:
     return h.model_copy(update={"service": PRIMARY_SERVICE[h.flag], "rationale": note + h.rationale})
 
 
+def votes_no_fault(report: DiagnosisReport) -> bool:
+    """A report says no fault either directly or by offering only no_fault hypotheses."""
+    return report.no_fault or (
+        bool(report.hypotheses) and all(h.fault_type == "no_fault" for h in report.hypotheses)
+    )
+
+
 def merge(reports: list[DiagnosisReport], evidence: set[str]) -> dict:
     """One ranked hypothesis list from several diagnosers: supported first, duplicates merged."""
     best: dict[tuple, Hypothesis] = {}
     for report in reports:
         for h in map(locate, ground(report.hypotheses, evidence)):
+            if h.fault_type == "no_fault":
+                continue
             key = (h.service, h.fault_type, h.flag)
             old = best.get(key)
             if old is None or (STATUS_ORDER[h.status], h.rank) < (STATUS_ORDER[old.status], old.rank):
@@ -82,8 +91,11 @@ def merge(reports: list[DiagnosisReport], evidence: set[str]) -> dict:
     hypotheses = [
         h.model_copy(update={"rank": i + 1, "id": f"h{i + 1}"}).model_dump() for i, h in enumerate(ranked)
     ]
-    no_fault = bool(reports) and all(r.no_fault for r in reports) and not hypotheses
+    no_fault = bool(reports) and all(votes_no_fault(r) for r in reports) and not hypotheses
     out = {"hypotheses": hypotheses, "no_fault": no_fault}
     if no_fault:
-        out["evidence"] = sorted({e for r in reports for e in r.evidence if e in evidence})
+        cited = {e for r in reports for e in r.evidence} | {
+            e for r in reports for h in r.hypotheses for e in h.evidence
+        }
+        out["evidence"] = sorted(cited & evidence)
     return out
