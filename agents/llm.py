@@ -41,6 +41,8 @@ def openrouter_chat(model_id: str, slot: dict, config: dict, api_key: str | None
         api_key=key,
         temperature=slot.get("temperature", 0.0),
         max_tokens=slot.get("max_tokens", 1000),
+        max_retries=6,  # with back-off; a dropped connection should not fail a whole run
+        timeout=120,
         default_headers={"X-Title": "On-Call Copilot"},
     )
 

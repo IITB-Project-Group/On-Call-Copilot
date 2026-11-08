@@ -269,11 +269,23 @@ def run_experiment(
     repeats: int | None = None,
     models=None,
     traces_dir: str | None = None,
+    resume: bool = False,
 ) -> dict:
+    """With ``resume``, rows already in ``out`` that finished without error are kept; only failed
+    or missing runs are run again, so an outage does not cost the finished runs twice."""
+    kept: dict[tuple, dict] = {}
+    if resume and out and Path(out).exists():
+        for line in Path(out).read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if not row.get("error"):
+                kept[(row["case"], row.get("repeat", 0))] = row
     rows = []
     for repeat in range(repeats or experiment.repeats):
         for case in cases:
-            rows.append(run_case(case, experiment, models=models, traces_dir=traces_dir, repeat=repeat))
+            row = kept.get((case["id"], repeat))
+            rows.append(
+                row or run_case(case, experiment, models=models, traces_dir=traces_dir, repeat=repeat)
+            )
     summary = {"experiment": experiment.name, **summarise(rows)}
     if out:
         path = Path(out)
@@ -292,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeats", type=int)
     parser.add_argument("--budget", type=int, help="Override the tool-call budget (E4).")
     parser.add_argument("--traces")
+    parser.add_argument("--resume", action="store_true", help="Keep finished rows in --out; rerun the rest.")
     args = parser.parse_args(argv)
     experiment = load_experiment(args.experiment)
     if args.budget:
@@ -302,7 +315,9 @@ def main(argv: list[str] | None = None) -> int:
         if experiment.playbook and not (experiment.playbook_frozen and playbook_check()):
             parser.error("freeze the playbook before a held-out run (python -m eval.playbook freeze)")
     cases = load_cases(args.split, args.cases_dir)
-    result = run_experiment(experiment, cases, out=args.out, repeats=args.repeats, traces_dir=args.traces)
+    result = run_experiment(
+        experiment, cases, out=args.out, repeats=args.repeats, traces_dir=args.traces, resume=args.resume
+    )
     print(json.dumps(result["summary"], indent=2))
     return 0
 

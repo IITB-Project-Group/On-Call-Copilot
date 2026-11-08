@@ -313,3 +313,28 @@ def test_a_hypothesis_without_a_flag_is_linked_to_the_one_active_flag_that_fits(
     other = {"service": "accounting", "fault_type": "latency", "flag": None}
     link_flag(other, {"flag.kafkaQueueProblems": True})
     assert other["flag"] is None
+
+
+def test_resume_keeps_finished_rows_and_reruns_failed_ones(tmp_path):
+    out = tmp_path / "r.jsonl"
+    exp = Experiment(architecture="c0", learn=False)
+    good = {
+        "case": "dev-f1-50pct",
+        "repeat": 0,
+        "error": None,
+        "success": True,
+        "latency_s": 1.0,
+        "tool_calls": 3,
+        "marker": "kept",
+    }
+    bad = {
+        "case": "dev-f3-50pct",
+        "repeat": 0,
+        "error": "OpenAIConnectionError: Connection error.",
+        "latency_s": 1.0,
+    }
+    out.write_text(json.dumps(good) + chr(10) + json.dumps(bad), encoding="utf-8")
+    rows = runner.run_experiment(
+        exp, [CASES["dev-f1-50pct"], CASES["dev-f3-50pct"]], out=out, repeats=1, resume=True
+    )["rows"]
+    assert rows[0]["marker"] == "kept" and rows[1]["error"] is None and rows[1]["success"]
