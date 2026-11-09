@@ -305,7 +305,7 @@ def test_default_db_path_uses_the_environment_or_a_temp_file(monkeypatch, tmp_pa
     assert default_db_path().endswith("oncall-incidents.sqlite3")
 
     monkeypatch.setattr(Path, "mkdir", lambda *args, **kwargs: None)
-    assert default_db_path() == "/data/incidents.sqlite3"
+    assert default_db_path() == str(Path("/data/incidents.sqlite3"))
 
 
 def test_store_rejects_bad_input(tmp_path):
