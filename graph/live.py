@@ -135,6 +135,19 @@ def build_live_agent(
                 code=pending["confirmation_code"],
                 command=pending["command"],
             )
+        # Close only when the graph is done and recovery was verified. Action approve must
+        # not close early — act, verify, and later HITL still need an open incident.
+        current = store.get(incident_id)
+        if (
+            current is not None
+            and current.get("decision") not in ("approve", "reject")
+            and not view.get("running")
+            and view.get("pending") is None
+            and view.get("outcome") == "resolved"
+        ):
+            store.decide(
+                incident_id, "approve", current.get("proposed_command") or current.get("command_text") or ""
+            )
 
     service = AgentService(deps, saver, run_async=run_async, metrics=AgentMetrics(registry), publish=publish)
     return service

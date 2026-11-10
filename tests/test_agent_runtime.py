@@ -404,18 +404,23 @@ def test_api_runs_the_agent_and_resumes_on_decisions(tmp_path, monkeypatch):
         f"/incidents/{iid}/decision", json={"decision": "approve", "confirmation": code, "approver": "oncall"}
     )
     assert first.status_code == 200
+    assert first.json().get("decision") is None  # stays open for act/verify/later HITL
     second = api.post(
         f"/incidents/{iid}/decision",
         json={"decision": "approve", "confirmation": code, "approver": "incident-commander"},
     ).json()
+    assert second.get("decision") is None
     assert second["agent"]["pending"]["kind"] == "comms"
     done = api.post(
         f"/incidents/{iid}/decision", json={"decision": "approve", "approver": "incident-commander"}
     ).json()
     assert done["agent"]["outcome"] == "resolved"
-    # Graph finished with no pending interrupt: approve/reject closes the open incident row.
-    closed = api.post(f"/incidents/{iid}/decision", json={"decision": "approve"})
-    assert closed.status_code == 200 and closed.json()["decision"] == "approve"
+    agent.wait(timeout=10)
+    finished = api.get(f"/incidents/{iid}").json()
+    # Resolved runs close themselves once the graph ends; otherwise a final approve closes.
+    if finished.get("decision") != "approve":
+        finished = api.post(f"/incidents/{iid}/decision", json={"decision": "approve"}).json()
+    assert finished["decision"] == "approve"
     assert (
         api.post(f"/incidents/{iid}/decision", json={"decision": "edit", "text": "note"}).status_code == 409
     )

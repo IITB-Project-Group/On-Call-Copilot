@@ -532,12 +532,15 @@ PAGE = """<!DOCTYPE html>
       const steps = plan.steps || [];
       let lastRunning = -1;
       steps.forEach((step, index) => { if (step.status === "running") lastRunning = index; });
-      // After escalate, communicate can be done while propose was left "running"; prefer later work.
+      // After escalate, a propose step left "running" should not look active.
+      // While HITL is pending, keep approve/communicate/learn as "now".
       const agentIdle = !view.running && !view.pending;
       fillRows(document.querySelector("#plan"), steps.map((step, index) => {
         let status = step.status === "running" && index < lastRunning ? "done" : step.status;
-        if ((agentIdle || view.pending) && status === "running") {
-          status = step.name === "propose" ? "failed" : "done";
+        if (agentIdle && status === "running") {
+          status = step.name === "propose" ? "failed" : "skipped";
+        } else if (view.pending && status === "running" && step.name === "propose") {
+          status = "failed";
         }
         return {
           name: readableName(step.name),

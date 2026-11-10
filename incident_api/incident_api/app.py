@@ -255,10 +255,9 @@ def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastA
                 "comms_approver": body.approver,
             },
         )
-        updated = current
-        if pending["kind"] == "action" and body.decision in ("approve", "reject"):
-            updated = store.decide(incident_id, body.decision, body.text) or current
-        return {**updated, "agent": agent.view(incident_id)}
+        # Keep the incident open after an action vote. Closing here hid act/verify/comms
+        # while the graph was still running (and broke SEV1's second approver in the UI).
+        return {**current, "agent": agent.view(incident_id)}
 
     @app.get("/incidents/{incident_id}/stream")
     async def stream(incident_id: str) -> StreamingResponse:
