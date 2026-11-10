@@ -53,8 +53,10 @@ class AgentService:
     def start(self, incident_id: str, alert: dict) -> None:
         self._run(incident_id, {"incident_id": incident_id, "alert": alert})
 
-    def resume(self, incident_id: str, decision: dict) -> None:
-        self._run(incident_id, Command(resume=decision))
+    def resume(self, incident_id: str, decision: dict, *, wait: bool = False, timeout: float = 45.0) -> None:
+        thread = self._run(incident_id, Command(resume=decision))
+        if wait and thread is not None:
+            thread.join(timeout)
 
     def resume_unfinished(self, incident_ids: list[str]) -> list[str]:
         """Continue runs that stopped mid-step (process killed). Runs waiting for a person stay waiting."""
@@ -70,13 +72,14 @@ class AgentService:
         for thread in list(self._threads):
             thread.join(timeout)
 
-    def _run(self, incident_id: str, value: Any) -> None:
+    def _run(self, incident_id: str, value: Any) -> threading.Thread | None:
         if self.run_async:
             thread = threading.Thread(target=self._invoke, args=(incident_id, value), daemon=True)
             self._threads.append(thread)
             thread.start()
-        else:
-            self._invoke(incident_id, value)
+            return thread
+        self._invoke(incident_id, value)
+        return None
 
     def note_activity(self, incident_id: str, text: str) -> None:
         """Show the tool / LLM step the agent is on. The graph only checkpoints when a step finishes."""

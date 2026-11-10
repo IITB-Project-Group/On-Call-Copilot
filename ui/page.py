@@ -273,18 +273,26 @@ PAGE = """<!DOCTYPE html>
       z-index: 40;
       display: flex;
       justify-content: flex-end;
-      background: rgba(23, 35, 44, 0.22);
+      align-items: center;
+      padding: 1.25rem;
+      background: rgba(23, 35, 44, 0.28);
     }
     .decision[hidden] { display: none; }
     .command {
-      width: min(24rem, 100%);
-      height: 100%;
+      width: min(28rem, calc(100vw - 2.5rem));
+      max-height: min(92vh, 44rem);
       overflow: auto;
       background: var(--panel);
-      border-left: 1px solid var(--line);
-      padding: 1.25rem 1.2rem 1.5rem;
-      box-shadow: -12px 0 36px rgba(23, 35, 44, 0.12);
+      border: 1px solid var(--line);
+      padding: 1.15rem 1.2rem 1.25rem;
+      box-shadow: 0 18px 48px rgba(23, 35, 44, 0.18);
     }
+    #hitl-message {
+      margin: 0 0 0.75rem;
+      color: var(--muted);
+    }
+    #hitl-message:empty { display: none; }
+    #hitl-message.error { color: var(--rejected); }
     .command-head {
       display: flex;
       align-items: flex-start;
@@ -364,10 +372,7 @@ PAGE = """<!DOCTYPE html>
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
-      .command { width: min(100%, 28rem); }
-    }
-    @media (max-width: 640px) {
-      .command { width: 100%; }
+      .decision { justify-content: center; }
     }
   </style>
 </head>
@@ -451,6 +456,7 @@ PAGE = """<!DOCTYPE html>
         <h2 id="decision-title">Your decision</h2>
         <button id="close-hitl" class="modal-close" type="button" aria-label="Close approval dialog">Close</button>
       </div>
+      <p id="hitl-message" aria-live="polite"></p>
       <p id="lead"></p>
       <div id="review-note" hidden></div>
       <div id="payload" class="payload" hidden></div>
@@ -500,6 +506,7 @@ PAGE = """<!DOCTYPE html>
     const closeFinished = document.querySelector("#close-finished");
     const openClose = document.querySelector("#open-close");
     const closeHitl = document.querySelector("#close-hitl");
+    const hitlMessage = document.querySelector("#hitl-message");
     const flagPolicy = "A checkout or payment incident also sets paymentFailure to off.";
     let current = null;
     let source = null;
@@ -1107,15 +1114,22 @@ PAGE = """<!DOCTYPE html>
       renderList();
     }
 
+    function setHitlMessage(text, isError) {
+      hitlMessage.textContent = text || "";
+      hitlMessage.className = isError ? "error" : "";
+      message.textContent = text || "";
+      if (isError) message.className = "hint";
+    }
+
     async function send(decisionName) {
       if (!current || sending) return;
       const needsCode = !document.querySelector("#code-fields").hidden;
       if (decisionName === "approve" && needsCode && !confirmation.value.trim()) {
-        message.textContent = "Type the code shown above, then approve.";
+        setHitlMessage("Type the confirmation code above, then approve.", true);
         return;
       }
       sending = true;
-      message.textContent = "";
+      setHitlMessage("Working…");
       try {
         const response = await fetch("/incidents/" + current + "/decision", {
           method: "POST",
@@ -1133,11 +1147,13 @@ PAGE = """<!DOCTYPE html>
           if (response.status === 404) {
             current = null;
             if (source) source.close();
+            setHitlOpen(false);
+            setHitlMessage("");
             message.textContent = "That incident is no longer on the server.";
             await loadList();
             return;
           }
-          message.textContent = detail;
+          setHitlMessage(detail, true);
           return;
         }
         const body = await response.json();
@@ -1146,26 +1162,31 @@ PAGE = """<!DOCTYPE html>
         if ((decisionName === "approve" || decisionName === "reject") && closed) {
           current = null;
           if (source) source.close();
+          setHitlOpen(false);
           await loadList();
           message.textContent = decisionName === "approve"
             ? (body.flag_result ? service + " closed. " + body.flag_result + "." : service + " closed.")
             : service + " closed. The shop was left unchanged.";
+          hitlMessage.textContent = "";
           return;
         }
         show(body);
         const stillAction = body.agent && body.agent.pending && body.agent.pending.kind === "action";
+        const stillPending = body.agent && body.agent.pending;
         const lastWhat = ((body.agent && body.agent.events) || []).slice(-1)[0];
         const approvalNote = lastWhat && String(lastWhat.what || "");
         if (decisionName === "edit") {
-          message.textContent = "Saved. The earlier approval was cleared.";
+          setHitlMessage("Saved. The earlier approval was cleared.");
         } else if (stillAction && /duplicate_approver/.test(approvalNote)) {
-          message.textContent = "Same approver already voted. Switch Approver to incident-commander, then approve again.";
+          setHitlMessage("Same approver already voted. Switch Approver to incident-commander, then approve again.", true);
         } else if (stillAction && /awaiting_second_approver|Approval not complete/.test(approvalNote)) {
-          message.textContent = "First vote recorded. Switch Approver to a different id (incident-commander), then approve again.";
+          setHitlMessage("First vote recorded. Switch Approver to incident-commander, then approve again.");
         } else if (stillAction) {
-          message.textContent = "Recorded. This command still needs approval before it runs.";
+          setHitlMessage("Recorded. This command still needs approval before it runs.");
+        } else if (stillPending) {
+          setHitlMessage("Recorded. Next review is ready.");
         } else {
-          message.textContent = "Recorded. This incident stays open for the next step.";
+          setHitlMessage("Recorded. The agent is continuing.");
         }
         loadList();
       } finally {

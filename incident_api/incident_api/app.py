@@ -254,10 +254,11 @@ def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastA
                 "confirmation": body.confirmation,
                 "comms_approver": body.approver,
             },
+            wait=True,
         )
         # Keep the incident open after an action vote. Closing here hid act/verify/comms
         # while the graph was still running (and broke SEV1's second approver in the UI).
-        # Return the refreshed store row so confirmation_code / pending stay in sync.
+        # Wait for the resume thread so the response reflects the next pending / running state.
         refreshed = store.get(incident_id) or current
         return {**refreshed, "agent": agent.view(incident_id)}
 
