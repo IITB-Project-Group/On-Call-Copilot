@@ -808,10 +808,11 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
-    function hitlLabel(pendingKind) {
+    function hitlLabel(pendingKind, finished) {
       if (pendingKind === "comms") return "A note is ready for your approval.";
       if (pendingKind === "lessons") return "Lessons are ready for your approval.";
       if (pendingKind === "action") return "A command is waiting for your approval.";
+      if (finished) return "The agent finished. Open review only if you want to close this incident.";
       return "Human approval is needed before the agent continues.";
     }
 
@@ -860,21 +861,22 @@ PAGE = """<!DOCTYPE html>
         && !incident.agent.running
         && !incident.agent.pending
         && Boolean(incident.agent.outcome);
-      const needsHitl = open && (waitingOnYou || agentFinishedOpen);
-      const nextKey = needsHitl
-        ? [incident.id, pendingKind || "finish", incident.confirmation_code || "", (incident.agent.pending || {}).command || ""].join("|")
+      // Popup only for a real HITL wait. Finished/escalated incidents stay quiet unless Review is clicked.
+      const autoHitl = open && waitingOnYou;
+      const nextKey = autoHitl
+        ? [incident.id, pendingKind || "", incident.confirmation_code || "", (incident.agent.pending || {}).command || ""].join("|")
         : "";
       if (nextKey !== hitlKey) {
         hitlKey = nextKey;
         hitlDismissed = false;
       }
       const form = document.querySelector("#decision-form");
-      form.hidden = open && !waitingForCode && !waitingOnYou;
+      form.hidden = open && !waitingOnYou && !agentFinishedOpen;
       // Show controls for a real HITL wait, or to close a finished escalated/no-action incident.
       controls.hidden = !open || stillWorking || (incident.agent && !waitingOnYou && !agentFinishedOpen);
       approve.textContent = pendingKind === "comms" ? "Approve this note"
         : pendingKind === "lessons" ? "Approve these lessons"
-        : writesFlag(incident) ? "Approve this command"
+        : writesFlag(incident) && waitingOnYou ? "Approve this command"
         : "Approve and close";
       const needsTwo = pendingKind === "action" && Number((incident.agent.pending || {}).required_approvals || 1) > 1;
       document.querySelector("#decision-hint").textContent = pendingKind === "comms" || pendingKind === "lessons"
@@ -882,9 +884,9 @@ PAGE = """<!DOCTYPE html>
         : needsTwo
           ? "Use two different Approver ids (oncall, then incident-commander). Approving twice as oncall does nothing."
           : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
-      hitlBannerText.textContent = hitlLabel(pendingKind);
-      hitlBanner.hidden = !needsHitl;
-      setHitlOpen(needsHitl && !hitlDismissed);
+      hitlBannerText.textContent = hitlLabel(pendingKind, agentFinishedOpen);
+      hitlBanner.hidden = !(open && (waitingOnYou || agentFinishedOpen));
+      setHitlOpen(autoHitl && !hitlDismissed);
     }
 
     function renderReview(incident) {
