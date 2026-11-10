@@ -6,7 +6,7 @@
 | Owner | _name_ |
 | Version | 0.1 draft, 7 November 2026 |
 | Based on | `main` at `f44a9f2` (5 November 2026) |
-| Status | Units U1 to U9 are built and tested (100% coverage); U10's documents are in [agents/](agents/README.md). The U0 decisions were taken as proposed, and are listed in agents/README.md section 7 for team confirmation. Model runs (C1, C2, Reflexion) are pending an OpenRouter key. |
+| Status | Units U1 to U9 are built and tested (100% coverage); U10's documents are in [agents/](agents/README.md). Development model runs (E1, E4, Reflexion drafts) are recorded. Live shop env, ticket copy, and retrieval fallback are wired. Held-out eval remains role 5. |
 
 This plan covers what role 3 builds, in what order, and what each step contributes to the submission. It follows the guide's coverage table ("How each project covers L4-L16"), the On-Call Copilot build table, the common stack, the evaluation protocol and the submission list. It adds nothing the guide does not ask for.
 

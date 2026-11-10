@@ -14,6 +14,10 @@ spec:
     metadata:
       labels:
         app: incident-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: incident-api
@@ -29,6 +33,17 @@ spec:
               value: http://flagd:4000
             - name: FLAGD_OFREP_URL
               value: http://flagd:8016
+            - name: PROMETHEUS_URL
+              value: http://prometheus:9090
+            - name: OPENSEARCH_URL
+              value: http://opensearch:9200
+            - name: JAEGER_URL
+              value: http://frontend-proxy:8080
+            - name: JAEGER_BASE_PATH
+              value: /jaeger/ui
+            # c2 falls back to the fixed workflow when OPENROUTER_API_KEY is unset.
+            - name: COPILOT_AGENT
+              value: c2
           readinessProbe:
             httpGet:
               path: /healthz
@@ -41,9 +56,9 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 128Mi
-            limits:
               memory: 256Mi
+            limits:
+              memory: 512Mi
       volumes:
         - name: data
           emptyDir: {}

@@ -253,6 +253,18 @@ prom_port="$(
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${prom_svc}" \
     -o jsonpath='{.spec.ports[0].port}'
 )"
+live_env=(
+  "COPILOT_AGENT=${COPILOT_AGENT:-c2}"
+  "PROMETHEUS_URL=http://${prom_svc}:${prom_port}"
+  "OPENSEARCH_URL=http://opensearch:9200"
+  "JAEGER_URL=http://frontend-proxy:8080"
+  "JAEGER_BASE_PATH=/jaeger/ui"
+)
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  live_env+=("OPENROUTER_API_KEY=${OPENROUTER_API_KEY}")
+fi
+kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" set env deploy/incident-api "${live_env[@]}"
+kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s
 for service in opensearch flagd; do
   if ! kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${service}" >/dev/null 2>&1; then
     echo "Service ${service} is missing from namespace ${NAMESPACE}." >&2
@@ -441,6 +453,7 @@ echo "  Telemetry MCP     http://127.0.0.1:${TELEMETRY_MCP_PORT}/mcp"
 echo "  Runbooks MCP      http://127.0.0.1:${RUNBOOKS_MCP_PORT}/mcp"
 echo
 echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "The incident API runs the agent graph (COPILOT_AGENT=${COPILOT_AGENT:-c2}; without OPENROUTER_API_KEY it uses the fixed workflow)."
 echo "The copilot MCP servers read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"

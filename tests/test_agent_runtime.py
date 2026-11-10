@@ -354,6 +354,7 @@ def make_app(tmp_path, env, flags):
         write_flag=twin.write_flag,
         fetch=None,
         run_async=False,
+        runbook_search=lambda query: ["payment-failure"],
     )
     agent.deps.backends.update(twin.tools())
     agent.deps.sleep = lambda s: None
@@ -402,6 +403,50 @@ def test_api_runs_the_agent_and_resumes_on_decisions(tmp_path, monkeypatch):
     ).json()
     assert done["agent"]["outcome"] == "resolved"
     assert api.post(f"/incidents/{iid}/decision", json={"decision": "approve"}).status_code == 409
+
+
+def test_live_agent_copies_ticket_drafts_into_the_store(tmp_path, monkeypatch):
+    monkeypatch.delenv("COPILOT_WEBHOOK_SECRET", raising=False)
+    app, agent = make_app(tmp_path, {"COPILOT_AGENT": "c0", "COPILOT_TRACES_DIR": str(tmp_path / "t")}, {})
+    api = TestClient(app)
+    iid = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
+    agent.deps.tickets.tools(iid)["status_draft"](incident_id=iid, note={"text": "checkout is failing"})
+    stored = api.get(f"/incidents/{iid}").json()
+    assert stored["tickets"]["drafts"][0]["text"] == "checkout is failing"
+    assert agent.deps.knowledge.search("payment") == ["payment-failure"]
+
+
+def test_hybrid_search_uses_role_two_then_disables_after_failure(monkeypatch):
+    class Tool:
+        def __call__(self, query):
+            return type("Response", (), {"runbook_ids": ["payment-failure"]})()
+
+    monkeypatch.setattr(live, "_default_runbooks_tool", lambda: Tool())
+    search = live.HybridSearch()
+    assert search("payment down") == ["payment-failure"]
+    assert search("again") == ["payment-failure"]
+
+    injected = live.HybridSearch(factory=lambda: Tool())
+    assert injected("payment down") == ["payment-failure"]
+
+    broken = live.HybridSearch(factory=lambda: (_ for _ in ()).throw(RuntimeError("no index")))
+    assert broken("q") == []
+    assert broken("again") == []
+
+    class Boom:
+        def __call__(self, query):
+            raise RuntimeError("query failed")
+
+    failing = live.HybridSearch(factory=lambda: Boom())
+    assert failing("q") == []
+
+
+def test_default_runbooks_tool_loads_role_two(monkeypatch):
+    monkeypatch.setattr(
+        "knowledge.retrieval.runbooks_kb_tool.create_runbooks_kb_tool",
+        lambda: "runbooks-tool",
+    )
+    assert live._default_runbooks_tool() == "runbooks-tool"
 
 
 def test_live_agent_builds_from_the_environment(tmp_path, monkeypatch):

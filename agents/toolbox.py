@@ -464,9 +464,13 @@ class KnowledgeBackend:
         return tools
 
     def runbook_search(self, query: str, service: str | None = None) -> list[dict]:
+        ranked: list[str] = []
         if self.search is not None:
-            ranked = [rid for rid in self.search(query) if rid in self.books]
-        else:
+            try:
+                ranked = [rid for rid in self.search(query) if rid in self.books]
+            except Exception:
+                ranked = []
+        if not ranked:
             scores = self.bm25.get_scores(_words(f"{query} {service or ''}"))
             ranked = [
                 self.ids[i] for i in sorted(range(len(scores)), key=lambda i: -scores[i]) if scores[i] > 0

@@ -25,6 +25,11 @@ ALERT = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _keep_the_original_gate_unless_a_test_opts_in(monkeypatch):
+    monkeypatch.delenv("COPILOT_AGENT", raising=False)
+
+
 def client(tmp_path, on_approve=None):
     application = create_app(
         str(tmp_path / "incidents.sqlite3"),

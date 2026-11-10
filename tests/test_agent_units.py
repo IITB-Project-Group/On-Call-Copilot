@@ -327,6 +327,12 @@ def test_knowledge_backend_ranks_runbooks_and_recalls_lessons():
     assert "memory_search" not in kb.tools(memory=False)
     hybrid = KnowledgeBackend(search=lambda q: ["nope", "cart-failure"])
     assert [r["id"] for r in hybrid.runbook_search("x")] == ["cart-failure"]
+    assert KnowledgeBackend(search=lambda q: []).runbook_search("payment errors")[0]["id"] == "payment-failure"
+    assert (
+        KnowledgeBackend(search=lambda q: (_ for _ in ()).throw(RuntimeError("down")))
+        .runbook_search("payment errors")[0]["id"]
+        == "payment-failure"
+    )
 
 
 def test_flag_ops_dry_run_and_restore_the_previous_variant():

@@ -199,4 +199,4 @@ The Astronomy Shop and the incident alert path run from `up.sh` on a local kind 
 - the C0 and C1 baselines;
 - Reflexion with lesson review and freezing.
 
-To run it, start the incident API with `COPILOT_AGENT=c2` and `OPENROUTER_API_KEY` set (`c0` needs no key). The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).
+`./up.sh` starts the graph in the incident API (`COPILOT_AGENT=c2`, falling back to `c0` without `OPENROUTER_API_KEY`). The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).
