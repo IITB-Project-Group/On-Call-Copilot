@@ -261,20 +261,19 @@ PAGE = """<!DOCTYPE html>
       position: fixed;
       inset: 0;
       z-index: 40;
-      display: grid;
-      place-items: center;
-      padding: 1.25rem;
-      background: rgba(23, 35, 44, 0.42);
+      display: flex;
+      justify-content: flex-end;
+      background: rgba(23, 35, 44, 0.22);
     }
     .decision[hidden] { display: none; }
     .command {
-      width: min(32rem, 100%);
-      max-height: min(92vh, 44rem);
+      width: min(24rem, 100%);
+      height: 100%;
       overflow: auto;
       background: var(--panel);
-      border: 1px solid var(--line);
-      padding: 1.15rem 1.2rem 1.25rem;
-      box-shadow: 0 18px 48px rgba(23, 35, 44, 0.18);
+      border-left: 1px solid var(--line);
+      padding: 1.25rem 1.2rem 1.5rem;
+      box-shadow: -12px 0 36px rgba(23, 35, 44, 0.12);
     }
     .command-head {
       display: flex;
@@ -355,6 +354,10 @@ PAGE = """<!DOCTYPE html>
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .command { width: min(100%, 28rem); }
+    }
+    @media (max-width: 640px) {
+      .command { width: 100%; }
     }
   </style>
 </head>
