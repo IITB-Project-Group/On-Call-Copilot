@@ -1073,6 +1073,7 @@ PAGE = """<!DOCTYPE html>
         source.close();
         setHitlOpen(false);
         hitlBanner.hidden = true;
+        closeFinished.hidden = true;
         message.textContent = "That incident is no longer on the server.";
         loadList();
       });
