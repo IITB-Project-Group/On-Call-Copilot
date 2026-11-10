@@ -14,7 +14,7 @@ prometheus:
         group_by: [alertname, service_name]
         group_wait: 10s
         group_interval: 1m
-        repeat_interval: 1h
+        repeat_interval: 5m
       receivers:
         - name: incident-api
           webhook_configs:
