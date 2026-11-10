@@ -158,9 +158,10 @@ PAGE = """<!DOCTYPE html>
     #activity-log li:first-of-type { color: var(--ink); font-weight: 560; }
     #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
     #plan-block { margin-top: 1.1rem; padding-top: 0.85rem; border-top: 1px solid var(--line); }
-    #agent h3, #plan-block h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
-    #plan-block h3 { margin-top: 0; }
+    #agent h3, #diagnosis h3, #plan-block h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
+    #plan-block h3, #diagnosis h3:first-of-type { margin-top: 0; }
     #plan-focus { margin: 0 0 0.45rem; }
+    #diagnosis[hidden] { display: none; }
     #plan-why summary {
       display: inline-flex;
       align-items: center;
@@ -401,15 +402,18 @@ PAGE = """<!DOCTYPE html>
             <p id="agent-error" hidden></p>
           </div>
           <div id="plan-block">
-            <h3>Plan</h3>
-            <p id="plan-focus" class="meta"></p>
+            <h3>Plan progress</h3>
             <ol id="plan"></ol>
-            <details id="plan-why">
-              <summary><span class="chevron" aria-hidden="true"></span> Why this plan</summary>
-              <p id="plan-reason"></p>
-            </details>
           </div>
-          <h3>Likely causes</h3>
+        </section>
+        <section id="diagnosis" class="detail-section" hidden aria-label="Diagnosis">
+          <h2>Diagnosis</h2>
+          <p id="plan-focus" class="meta"></p>
+          <details id="plan-why">
+            <summary><span class="chevron" aria-hidden="true"></span> Why this plan</summary>
+            <p id="plan-reason"></p>
+          </details>
+          <h3 id="causes-title">Likely causes</h3>
           <ol id="hypotheses"></ol>
         </section>
         <div id="hitl-banner" class="hitl-banner" hidden>
@@ -680,14 +684,21 @@ PAGE = """<!DOCTYPE html>
     function renderAgent(incident) {
       const view = incident.agent;
       const panel = document.querySelector("#agent");
+      const diagnosis = document.querySelector("#diagnosis");
       const now = document.querySelector("#now");
       now.textContent = storyOf(incident);
       now.className = view && view.error ? "error" : "";
       renderStages(incident);
       panel.hidden = !view;
-      if (!view) return;
+      if (!view) {
+        diagnosis.hidden = true;
+        return;
+      }
       const plan = view.plan || {steps: [], focus: []};
       const focus = (plan.focus || []).map(readableName).join(", ");
+      const hypotheses = view.hypotheses || [];
+      const hasDiagnosis = Boolean(focus || plan.reason || hypotheses.length);
+      diagnosis.hidden = !hasDiagnosis;
       document.querySelector("#plan-focus").textContent = focus ? "Focus: " + focus : "";
       const why = document.querySelector("#plan-why");
       why.hidden = !plan.reason;
@@ -715,9 +726,10 @@ PAGE = """<!DOCTYPE html>
         };
       }));
       const causes = document.querySelector("#hypotheses");
-      causes.previousElementSibling.hidden = !(view.hypotheses || []).length;
-      causes.hidden = !(view.hypotheses || []).length;
-      fillRows(causes, (view.hypotheses || []).map((item) => ({
+      const causesTitle = document.querySelector("#causes-title");
+      causesTitle.hidden = !hypotheses.length;
+      causes.hidden = !hypotheses.length;
+      fillRows(causes, hypotheses.map((item) => ({
         name: (item.rank ? item.rank + ". " : "") + readableName(item.service),
         status: String(item.fault_type || "").replaceAll("_", " ") + (item.status ? " · " + item.status : "")
       })));
