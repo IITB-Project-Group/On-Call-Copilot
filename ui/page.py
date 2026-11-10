@@ -108,34 +108,69 @@ PAGE = """<!DOCTYPE html>
       line-height: 1.4;
     }
     .kicker { margin: 1.35rem 0 0.4rem; font-weight: 600; }
-    #pending { margin: 0.35rem 0 0; font-size: 1.05rem; }
-    #live { display: flex; align-items: center; gap: 0.55rem; margin: 0.45rem 0 0; font-size: 1.05rem; }
-    #live[hidden] { display: none; }
-    #live-activity {
-      margin: 0.35rem 0 0 1.5rem;
-      max-width: 42rem;
-      color: var(--ink);
+    #pending { margin: 0.45rem 0 0; font-size: 1.05rem; }
+    #live-panel { margin: 0.35rem 0 1rem; max-width: 42rem; }
+    #live, #live-activity {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr;
+      gap: 0.55rem 0.75rem;
+      align-items: center;
+      margin: 0.35rem 0 0;
       font-size: 1.02rem;
     }
-    #live-activity[hidden] { display: none; }
+    #live { grid-template-columns: 4.5rem auto 1fr; }
+    #live[hidden], #live-activity[hidden] { display: none; }
+    .live-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant: all-small-caps;
+      letter-spacing: 0.04em;
+    }
     #activity-log {
       list-style: none;
-      margin: 0.55rem 0 0;
-      padding: 0;
+      margin: 0.65rem 0 0;
+      padding: 0.35rem 0 0;
+      border-top: 1px solid var(--line);
       max-width: 42rem;
     }
     #activity-log[hidden] { display: none; }
+    #activity-log .log-title {
+      margin: 0 0 0.35rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant: all-small-caps;
+      letter-spacing: 0.04em;
+    }
     #activity-log li {
       display: grid;
       grid-template-columns: 4.5rem 1fr;
       gap: 0.65rem;
       padding: 0.28rem 0;
-      border-top: 1px solid var(--line);
       color: var(--muted);
       font-size: 0.92rem;
     }
-    #activity-log li:first-child { border-top: 0; color: var(--ink); font-weight: 560; }
+    #activity-log li:first-of-type { color: var(--ink); font-weight: 560; }
     #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
+    #plan-block { margin-top: 1.1rem; }
+    #plan-block h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    #plan-focus { margin: 0 0 0.45rem; }
+    #plan-why summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      list-style: none;
+    }
+    #plan-why summary::-webkit-details-marker { display: none; }
+    #plan-why .chevron {
+      width: 0.4rem;
+      height: 0.4rem;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+    }
+    #plan-why[open] .chevron { transform: rotate(45deg); }
     .pulse { display: inline-flex; gap: 0.22rem; align-items: center; height: 1rem; }
     .pulse[hidden], #phase[hidden] { display: none; }
     .pulse i {
@@ -275,20 +310,32 @@ PAGE = """<!DOCTYPE html>
         <p id="alert" class="meta"></p>
         <div id="agent" hidden>
           <h2>What the agent is doing</h2>
-          <div id="live" hidden>
-            <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span id="phase">Thinking</span>
+          <div id="live-panel">
+            <div id="live" hidden>
+              <span class="live-label">Now</span>
+              <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="phase">Investigating</span>
+            </div>
+            <p id="live-activity" hidden>
+              <span class="live-label">Current</span>
+              <span id="live-activity-text"></span>
+            </p>
+            <div id="activity-log" hidden aria-label="Recent agent actions">
+              <p class="log-title">Recent steps</p>
+              <ol id="activity-log-items"></ol>
+            </div>
+            <p id="pending"></p>
+            <p id="agent-error" hidden></p>
           </div>
-          <p id="live-activity" hidden></p>
-          <ol id="activity-log" hidden aria-label="Recent agent actions"></ol>
-          <p id="pending"></p>
-          <p id="agent-error" hidden></p>
-          <p id="plan-focus" class="meta"></p>
-          <ol id="plan"></ol>
-          <details id="plan-why">
-            <summary>Why this plan</summary>
-            <p id="plan-reason"></p>
-          </details>
+          <div id="plan-block">
+            <h3>Plan</h3>
+            <p id="plan-focus" class="meta"></p>
+            <ol id="plan"></ol>
+            <details id="plan-why">
+              <summary><span class="chevron" aria-hidden="true"></span> Why this plan</summary>
+              <p id="plan-reason"></p>
+            </details>
+          </div>
           <h2>Likely causes</h2>
           <ol id="hypotheses"></ol>
         </div>
@@ -485,15 +532,15 @@ PAGE = """<!DOCTYPE html>
       const named = {
         triage: "Investigating",
         diagnose: "Investigating",
-        runbook: "Reading the runbook",
+        runbook: "Reading runbooks",
         propose: "Planning the command",
-        approve: "Preparing your review",
+        approve: "Waiting for approval",
         act: "Applying the command",
         verify: "Checking recovery",
         communicate: "Writing the note",
         learn: "Reviewing lessons"
       };
-      return named[current] || "Thinking";
+      return named[current] || "Investigating";
     }
 
     function plainActivity(text) {
@@ -520,9 +567,10 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderActivityLog(view) {
-      const node = document.querySelector("#activity-log");
+      const wrap = document.querySelector("#activity-log");
+      const node = document.querySelector("#activity-log-items");
       const rows = (view.activity_log || []).slice().reverse().slice(0, 8);
-      node.hidden = !rows.length;
+      wrap.hidden = !rows.length;
       node.replaceChildren();
       for (const row of rows) {
         const item = document.createElement("li");
@@ -547,7 +595,7 @@ PAGE = """<!DOCTYPE html>
       if (!view) return;
       const plan = view.plan || {steps: [], focus: []};
       const focus = (plan.focus || []).map(readableName).join(", ");
-      document.querySelector("#plan-focus").textContent = focus ? "Looking at " + focus + "." : "";
+      document.querySelector("#plan-focus").textContent = focus ? "Focus: " + focus : "";
       const why = document.querySelector("#plan-why");
       why.hidden = !plan.reason;
       document.querySelector("#plan-reason").textContent = plan.reason || "";
@@ -585,14 +633,13 @@ PAGE = """<!DOCTYPE html>
       const activity = (!pending && view.running) ? plainActivity(view.activity) : "";
       const live = document.querySelector("#live");
       const liveActivity = document.querySelector("#live-activity");
-      // Phase + current tool/LLM line while working; recent log stays visible after pauses.
       live.hidden = !phase;
       document.querySelector("#live .pulse").hidden = !phase;
       const phaseNode = document.querySelector("#phase");
       phaseNode.hidden = !phase;
       phaseNode.textContent = phase;
       liveActivity.hidden = !activity;
-      liveActivity.textContent = activity;
+      document.querySelector("#live-activity-text").textContent = activity;
       renderActivityLog(view);
       const detail = pending
         ? (pending.kind === "action" ? "Waiting for you to approve the command." :
