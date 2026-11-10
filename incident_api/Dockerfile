@@ -10,11 +10,16 @@ COPY tools ./tools
 COPY safety ./safety
 COPY agents ./agents
 COPY graph ./graph
+COPY knowledge/__init__.py ./knowledge/__init__.py
 COPY knowledge/runbooks ./knowledge/runbooks
+COPY knowledge/postmortems ./knowledge/postmortems
 COPY knowledge/playbook ./knowledge/playbook
+COPY knowledge/retrieval ./knowledge/retrieval
 COPY incident_api/incident_api ./incident_api
+COPY incident_api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV INCIDENT_DB=/data/incidents.sqlite3
 ENV PYTHONPATH=/app:/app/safety
 EXPOSE 8000
-CMD ["uvicorn", "incident_api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/entrypoint.sh"]

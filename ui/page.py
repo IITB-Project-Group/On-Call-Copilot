@@ -143,6 +143,7 @@ PAGE = """<!DOCTYPE html>
       border-top: 1px solid var(--line);
     }
     #plan li.running { font-weight: 600; }
+    #plan li.failed .status { color: var(--reject, #a33); }
     #plan .status, #hypotheses .status { color: var(--muted); text-align: right; }
     pre {
       white-space: pre-wrap;
@@ -493,16 +494,23 @@ PAGE = """<!DOCTYPE html>
       const why = document.querySelector("#plan-why");
       why.hidden = !plan.reason;
       document.querySelector("#plan-reason").textContent = plan.reason || "";
-      const stepWord = { running: "now", pending: "waiting", done: "done" };
+      const stepWord = {
+        running: "now", pending: "waiting", done: "done", failed: "failed", skipped: "skipped"
+      };
       const steps = plan.steps || [];
       let lastRunning = -1;
       steps.forEach((step, index) => { if (step.status === "running") lastRunning = index; });
+      // After escalate, communicate can be done while propose was left "running"; prefer later work.
+      const agentIdle = !view.running && !view.pending;
       fillRows(document.querySelector("#plan"), steps.map((step, index) => {
-        const status = step.status === "running" && index < lastRunning ? "done" : step.status;
+        let status = step.status === "running" && index < lastRunning ? "done" : step.status;
+        if (agentIdle && status === "running") {
+          status = step.name === "propose" ? "failed" : "skipped";
+        }
         return {
           name: readableName(step.name),
           status: stepWord[status] || status,
-          mark: status === "running" ? "running" : ""
+          mark: status === "running" ? "running" : status === "failed" ? "failed" : ""
         };
       }));
       const causes = document.querySelector("#hypotheses");
@@ -649,9 +657,15 @@ PAGE = """<!DOCTYPE html>
       confirmation.placeholder = waitingForCode ? incident.confirmation_code : "Type the code shown with the command";
       command.readOnly = !open;
       const stillWorking = incident.agent && incident.agent.running && !(incident.agent.pending);
+      const waitingOnYou = Boolean(pendingKind);
+      const agentFinishedOpen = incident.agent
+        && !incident.agent.running
+        && !incident.agent.pending
+        && Boolean(incident.agent.outcome);
       const form = document.querySelector("#decision-form");
-      form.hidden = open && !waitingForCode && !(incident.agent && incident.agent.pending);
-      controls.hidden = !open || stillWorking;
+      form.hidden = open && !waitingForCode && !waitingOnYou;
+      // Show controls for a real HITL wait, or to close a finished escalated/no-action incident.
+      controls.hidden = !open || stillWorking || (incident.agent && !waitingOnYou && !agentFinishedOpen);
       approve.textContent = pendingKind === "comms" ? "Approve this note"
         : pendingKind === "lessons" ? "Approve these lessons"
         : writesFlag(incident) ? "Approve this command"

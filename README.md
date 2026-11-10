@@ -54,6 +54,8 @@ cp deploy/openrouter-secret.example.yaml deploy/openrouter-secret.yaml
 
 `OPENROUTER_API_KEY` in the shell is used instead of that file when it is set. With no key, `./up.sh` still starts and the API uses the fixed workflow. Change model ids in `deploy/copilot-models.yaml` and run `./up.sh` again.
 
+Guardrail spans go to the shop collector. In Jaeger they appear as the service `incident-api`. When the OpenRouter key is present, the API builds a Chroma index of the runbooks and postmortems on startup and keeps it on the `incident-data` volume. A later start of that volume does not embed the corpus again. Without a key, or if that build fails, runbook search stays on BM25 over the runbooks in the image.
+
 `up.sh` creates a kind cluster named `otel-demo`, installs the [OpenTelemetry Demo Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-demo) into the `otel-demo` namespace, and publishes the frontend proxy on port 8080. Run it again to reuse an existing cluster and release. The first run pulls images and can take several minutes.
 
 On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports no CPU share support. kind then stops and asks for the systemd property `Delegate=yes`. `up.sh` detects that and switches to kind's Podman provider, which reads the cgroup controllers from `podman info`.

@@ -3,6 +3,44 @@ components:
     service:
       type: NodePort
       nodePort: 30080
+  # Kind is a single node. Chromium browser traffic from Locust burns CPU and
+  # makes Grafana flap behind Envoy (upstream connect / remote connection failure).
+  load-generator:
+    envOverrides:
+      - name: LOCUST_USERS
+        value: "2"
+      - name: LOCUST_BROWSER_TRAFFIC_ENABLED
+        value: "false"
+
+# Give Grafana room and slower readiness so brief stalls do not empty the
+# Service endpoints and trip frontend-proxy with UC / remote connection failure.
+grafana:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: grafana
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: grafana
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 30
+    failureThreshold: 10
+    successThreshold: 1
+
 prometheus:
   alertmanager:
     enabled: true

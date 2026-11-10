@@ -174,6 +174,11 @@ def test_blocked_proposal_is_counted_and_escalates():
     state, *_ = run(CASES["dev-f1-50pct"], exp, {"remediation": bad})
     assert all(p["blocked"] for p in state["proposals"])
     assert state["outcome"] == "escalated"
+    by_name = {step["name"]: step["status"] for step in state["plan"]["steps"]}
+    assert by_name["propose"] == "failed"
+    assert by_name["approve"] == "skipped"
+    assert by_name["act"] == "skipped"
+    assert by_name["verify"] == "skipped"
 
 
 def test_no_proposal_and_unfinished_specialists_fall_back():

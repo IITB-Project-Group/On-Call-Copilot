@@ -105,9 +105,19 @@ install_shop() {
     --timeout 20m
 }
 
+upgrade_shop() {
+  echo "Applying shop values from deploy/shop-values.yaml."
+  helm upgrade "${RELEASE}" open-telemetry/opentelemetry-demo \
+    --kube-context "${KUBE_CONTEXT}" \
+    --namespace "${NAMESPACE}" \
+    --values "${workdir}/values.yaml" \
+    --timeout 20m
+}
+
 if helm --kube-context "${KUBE_CONTEXT}" status "${RELEASE}" --namespace "${NAMESPACE}" >/dev/null 2>&1; then
   if kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get statefulset -o name 2>/dev/null | grep -q alertmanager; then
     echo "Helm release ${RELEASE} is already installed in namespace ${NAMESPACE}."
+    upgrade_shop
   else
     echo "Alertmanager is missing. Reinstalling the shop so the checkout alert can fire."
     helm uninstall "${RELEASE}" --kube-context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" --wait --timeout 10m
