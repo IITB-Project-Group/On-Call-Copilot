@@ -150,7 +150,43 @@ fi
 echo "Building the incident API image."
 docker build --load -f "${ROOT}/incident_api/Dockerfile" -t "${IMAGE_NAME}" "${ROOT}"
 kind load docker-image "${IMAGE_NAME}" --name "${CLUSTER_NAME}"
+# Models are deploy/copilot-models.yaml. The key is the shell variable, or deploy/openrouter-secret.yaml.
+echo "Applying the copilot-models ConfigMap."
+kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/copilot-models.yaml"
+secret_updated=0
+secret_file="${ROOT}/deploy/openrouter-secret.yaml"
+if [[ -z "${OPENROUTER_API_KEY:-}" && -f "${secret_file}" ]]; then
+  OPENROUTER_API_KEY="$(
+    awk '
+      $1 == "api-key:" {
+        val = $0
+        sub(/^[[:space:]]*api-key:[[:space:]]*/, "", val)
+        gsub(/^["'\'']|["'\'']$/, "", val)
+        print val
+        exit
+      }
+    ' "${secret_file}"
+  )"
+  if [[ -z "${OPENROUTER_API_KEY}" || "${OPENROUTER_API_KEY}" == "REPLACE_ME" ]]; then
+    unset OPENROUTER_API_KEY
+    echo "deploy/openrouter-secret.yaml has no api-key. The API uses the fixed workflow."
+  fi
+fi
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  echo "Storing the OpenRouter key in secret openrouter."
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" create secret generic openrouter \
+    --from-literal=api-key="${OPENROUTER_API_KEY}" \
+    --dry-run=client -o yaml |
+    kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" apply -f -
+  secret_updated=1
+else
+  echo "No OpenRouter key. Copy deploy/openrouter-secret.example.yaml to deploy/openrouter-secret.yaml, or export OPENROUTER_API_KEY. The API uses the fixed workflow."
+fi
+unset OPENROUTER_API_KEY
 kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/incident-api.yaml"
+if (( secret_updated == 1 )); then
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout restart deployment/incident-api
+fi
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s
 
 # OpenSearch maps attributes.http as text after the first string value, then
@@ -253,6 +289,15 @@ prom_port="$(
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${prom_svc}" \
     -o jsonpath='{.spec.ports[0].port}'
 )"
+live_env=(
+  "COPILOT_AGENT=${COPILOT_AGENT:-c2}"
+  "PROMETHEUS_URL=http://${prom_svc}:${prom_port}"
+  "OPENSEARCH_URL=http://opensearch:9200"
+  "JAEGER_URL=http://frontend-proxy:8080"
+  "JAEGER_BASE_PATH=/jaeger/ui"
+)
+kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" set env deploy/incident-api "${live_env[@]}"
+kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s
 for service in opensearch flagd; do
   if ! kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" get "svc/${service}" >/dev/null 2>&1; then
     echo "Service ${service} is missing from namespace ${NAMESPACE}." >&2
@@ -441,6 +486,7 @@ echo "  Telemetry MCP     http://127.0.0.1:${TELEMETRY_MCP_PORT}/mcp"
 echo "  Runbooks MCP      http://127.0.0.1:${RUNBOOKS_MCP_PORT}/mcp"
 echo
 echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
+echo "The incident API runs the agent graph (COPILOT_AGENT=${COPILOT_AGENT:-c2}; without secret openrouter it uses the fixed workflow)."
 echo "The copilot MCP servers read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"

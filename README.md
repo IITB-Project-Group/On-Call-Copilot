@@ -31,9 +31,27 @@ If a laptop cannot run the demo, the fallback is a four-service FastAPI shop wit
 
 Prerequisites: Docker or Podman, [kind](https://kind.sigs.k8s.io/), Helm 3.14 or newer, and kubectl. The container runtime needs about 6 GB of free RAM.
 
+Cluster manifests live in `deploy/`:
+
+| File | What it is |
+| --- | --- |
+| `shop-values.yaml` | Helm values for the Astronomy Shop |
+| `agent-alert-rules.yaml` | Prometheus rules for the agent |
+| `incident-api.yaml` | Incident API deployment and service |
+| `copilot-models.yaml` | Model ids, mounted into the API |
+| `openrouter-secret.example.yaml` | Template for the OpenRouter key |
+| `incident-port-forward.py` | Keeps the console on port 8000 |
+| `shop-port-forward.py` | Keeps the shop tool ports open |
+
+Put your OpenRouter key in the secret, then start the cluster. The key file stays on your machine.
+
 ```shell
+cp deploy/openrouter-secret.example.yaml deploy/openrouter-secret.yaml
+# Set stringData.api-key in deploy/openrouter-secret.yaml
 ./up.sh
 ```
+
+`OPENROUTER_API_KEY` in the shell is used instead of that file when it is set. With no key, `./up.sh` still starts and the API uses the fixed workflow. Change model ids in `deploy/copilot-models.yaml` and run `./up.sh` again.
 
 `up.sh` creates a kind cluster named `otel-demo`, installs the [OpenTelemetry Demo Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-demo) into the `otel-demo` namespace, and publishes the frontend proxy on port 8080. Run it again to reuse an existing cluster and release. The first run pulls images and can take several minutes.
 
@@ -199,4 +217,4 @@ The Astronomy Shop and the incident alert path run from `up.sh` on a local kind 
 - the C0 and C1 baselines;
 - Reflexion with lesson review and freezing.
 
-To run it, start the incident API with `COPILOT_AGENT=c2` and `OPENROUTER_API_KEY` set (`c0` needs no key). The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).
+`./up.sh` starts the graph in the incident API (`COPILOT_AGENT=c2`). Model ids come from `deploy/copilot-models.yaml`. The API falls back to the fixed workflow when secret `openrouter` is absent. The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).

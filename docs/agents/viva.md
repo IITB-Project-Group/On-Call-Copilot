@@ -78,3 +78,4 @@ Short answers to the questions the guide says every member must handle, for role
 - Restart, scale and deploy rollback are validated but not executable here (no Kubernetes write client).
 - flagd keeps no change history, so live `recent_changes` reports each active flag as observed now.
 - The approval service is in memory, so after an API restart a pending approval is proposed again under a new request (the code is the same, since it is bound to the command).
+- Live runbook search uses role 2's hybrid index when it loads, otherwise BM25 over the runbook files.

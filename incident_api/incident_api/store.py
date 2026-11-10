@@ -182,9 +182,23 @@ class IncidentStore:
 
     def _ensure_columns(self, connection: sqlite3.Connection) -> None:
         present = {row[1] for row in connection.execute("PRAGMA table_info(incidents)")}
-        for name in ("approval_request_id", "confirmation_code", "proposed_command", "agent_json"):
+        for name in (
+            "approval_request_id",
+            "confirmation_code",
+            "proposed_command",
+            "agent_json",
+            "tickets_json",
+        ):
             if name not in present:
                 connection.execute(f"ALTER TABLE incidents ADD COLUMN {name} TEXT")
+
+    def set_tickets(self, incident_id: str, record: dict) -> None:
+        """Copy comms drafts and published notes from the agent ticket sink."""
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE incidents SET tickets_json = ? WHERE id = ?",
+                (json.dumps(record, default=str), incident_id),
+            )
 
 
 def _note(alert_name: str, service: str, starts_at: str, payload: str) -> str:
@@ -214,4 +228,5 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "confirmation_code": row["confirmation_code"],
         "proposed_command": row["proposed_command"],
         "agent": json.loads(row["agent_json"]) if row["agent_json"] else None,
+        "tickets": json.loads(row["tickets_json"]) if row["tickets_json"] else None,
     }

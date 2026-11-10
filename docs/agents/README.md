@@ -71,11 +71,11 @@ specialist (ReAct) ──> RoleToolset ──> GuardedExecutor.call_tool ──>
 
 | Layer | What we use | Where |
 | --- | --- | --- |
-| Models | OpenRouter: `openai/gpt-4.1` for the commander, `openai/gpt-4.1-mini` for the specialists, a judge from a different family | `agents/config/agents.yaml`, `agents/llm.py` |
+| Models | OpenRouter: `openai/gpt-6-luna` for the commander, `openai/gpt-4.1-mini` for the specialists, a judge from a different family | `agents/config/agents.yaml`, `agents/llm.py` |
 | Orchestration | LangGraph `StateGraph`, typed state, conditional edges, `Send` fan-out, SQLite checkpointer, `interrupt()` / `Command(resume=...)` | `graph/incident_graph.py`, `graph/service.py` |
 | Long-term memory | LangGraph store (`InMemoryStore`, or `SqliteStore` live) with precondition-checked lessons | `agents/memory/lessons.py` |
 | Tools | FastMCP servers loaded with langchain-mcp-adapters (`McpFetch`; descriptions pinned to the repo), or the in-process client | `agents/toolbox.py` |
-| Retrieval | BM25 over the runbooks (rank-bm25), or role 2's hybrid service | `KnowledgeBackend` |
+| Retrieval | Role 2's hybrid index when it loads; BM25 over the runbooks otherwise | `KnowledgeBackend`, `graph/live.py` `HybridSearch` |
 | Guardrails | Role 4's hooks, input and output guardrails, approval service; nothing bypasses them | `safety/` |
 | Improvement | Reflexion: agent, evaluator (checker code), reflection, human review, freeze | `eval/reflexion.py`, `eval/playbook.py` |
 | Evaluation | pytest, a JSONL runner, checker code | `eval/runner.py`, `tests/test_agent_*.py` |
@@ -207,7 +207,12 @@ python -m graph.cli run --workdir demo --case dev-f1-50pct --arch c0 --crash-aft
 python -m graph.cli resume --workdir demo
 python -m graph.cli decide --workdir demo --decision approve --approver eval-oncall --code <CODE>
 
-# Live, inside the incident API (after ./up.sh)
+# Live, inside the cluster (after ./up.sh)
+# deploy/incident-api.yaml sets COPILOT_AGENT=c2 and in-cluster Prometheus/Jaeger/OpenSearch.
+# Model ids are deploy/copilot-models.yaml. The image file is the fallback.
+# Put the key in deploy/openrouter-secret.yaml (see the example) or export OPENROUTER_API_KEY.
+# Without that secret the API falls back to c0 (fixed workflow, no model).
+# Local process instead of the pod:
 COPILOT_AGENT=c2 OPENROUTER_API_KEY=... uvicorn incident_api.app:app   # COPILOT_MCP_URL=http://127.0.0.1:8012/mcp to read via MCP
 
 # Evidence in docs/agents (offline)

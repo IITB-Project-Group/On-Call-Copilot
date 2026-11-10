@@ -1,13 +1,14 @@
 # Agent configuration: models, budgets and prompts in one versioned file (L16).
 # Change `version` whenever a model, budget or prompt changes, and record the change in
 # docs/agents/experiment-log.md. Every run records this version and the exact model IDs.
-version: "2026-11-08.5"
+version: "2026-11-10.1"
 
 models:
   provider: openrouter
   base_url: https://openrouter.ai/api/v1
   # The L11 lab found gpt-4o-mini unreliable as a coordinator, so the commander uses a stronger model.
-  commander: {id: openai/gpt-4.1, temperature: 0.0, max_tokens: 1200}
+  # gpt-4.1 is outside this key's OpenRouter allow-list; gpt-6-luna is the allowed stronger model.
+  commander: {id: openai/gpt-6-luna, temperature: 0.0, max_tokens: 1200}
   specialist: {id: openai/gpt-4.1-mini, temperature: 0.0, max_tokens: 1200}
   reflection: {id: openai/gpt-4.1-mini, temperature: 0.2, max_tokens: 900}
   # A different model family, so the judge does not share the agents' blind spots.
@@ -16,6 +17,7 @@ models:
 # USD per million tokens, used only by the cost cap hook. Check openrouter.ai/models before a run.
 pricing:
   openai/gpt-4.1: {input_per_mtok: 2.0, output_per_mtok: 8.0}
+  openai/gpt-6-luna: {input_per_mtok: 3.0, output_per_mtok: 15.0}
   openai/gpt-4.1-mini: {input_per_mtok: 0.40, output_per_mtok: 1.60}
   openai/gpt-4o-mini: {input_per_mtok: 0.15, output_per_mtok: 0.60}
   google/gemini-3.1-flash-lite: {input_per_mtok: 0.25, output_per_mtok: 1.50}

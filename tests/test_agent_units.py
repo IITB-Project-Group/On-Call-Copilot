@@ -58,7 +58,7 @@ def test_experiments_validate_and_split_the_same_budget(tmp_path):
     with pytest.raises(ValueError):
         settings.Experiment(budget=0)
     exp = settings.Experiment(models={"specialist": "x/y"})
-    assert exp.model_id("specialist") == "x/y" and exp.model_id("commander") == "openai/gpt-4.1"
+    assert exp.model_id("specialist") == "x/y" and exp.model_id("commander") == "openai/gpt-6-luna"
     assert exp.with_budget(20).name.endswith("-b20")
     for total in (5, 10, 20):
         assert sum(settings.role_budgets(settings.Experiment(budget=total)).values()) == total
@@ -68,6 +68,46 @@ def test_experiments_validate_and_split_the_same_budget(tmp_path):
     path = tmp_path / "e.yaml"
     path.write_text("name: x\narchitecture: c1\n", encoding="utf-8")
     assert settings.load_experiment(path).architecture == "c1"
+
+
+def test_models_file_overrides_packaged_ids(tmp_path, monkeypatch):
+    overlay = tmp_path / "models.yaml"
+    overlay.write_text(
+        "version: 'live'\nmodels:\n  commander: {id: openai/gpt-4.1-mini, temperature: 0.1}\n"
+        "  provider: openrouter\n  extra: {id: z/z}\npricing:\n  openai/gpt-4.1-mini: {input_per_mtok: 1, output_per_mtok: 2}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(overlay))
+    settings.load_config.cache_clear()
+    try:
+        config = settings.load_config()
+        assert config["models"]["commander"] == {
+            "id": "openai/gpt-4.1-mini",
+            "temperature": 0.1,
+            "max_tokens": 1200,
+        }
+        assert config["models"]["specialist"]["id"] == "openai/gpt-4.1-mini"
+        assert config["models"]["provider"] == "openrouter"
+        assert config["pricing"]["openai/gpt-4.1-mini"]["input_per_mtok"] == 1
+        assert config["models"]["extra"] == {"id": "z/z"}
+        assert config["version"] == "live"
+    finally:
+        settings.load_config.cache_clear()
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("", encoding="utf-8")
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(empty))
+    settings.load_config.cache_clear()
+    try:
+        assert settings.load_config()["version"] == "2026-11-10.1"
+    finally:
+        settings.load_config.cache_clear()
+    missing = tmp_path / "absent.yaml"
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(missing))
+    settings.load_config.cache_clear()
+    try:
+        assert settings.load_config()["models"]["commander"]["id"] == "openai/gpt-6-luna"
+    finally:
+        settings.load_config.cache_clear()
 
 
 # ---------------------------------------------------------------- models
@@ -84,8 +124,8 @@ def test_model_factory_builds_one_model_per_slot():
     built = []
     factory = ModelFactory(settings.Experiment(), builder=lambda mid, slot, cfg: built.append(mid) or mid)
     assert factory.get("triage") == factory.get("diagnosis") == "openai/gpt-4.1-mini"
-    assert factory.get("replan") == "openai/gpt-4.1"
-    assert built == ["openai/gpt-4.1-mini", "openai/gpt-4.1"]
+    assert factory.get("replan") == "openai/gpt-6-luna"
+    assert built == ["openai/gpt-4.1-mini", "openai/gpt-6-luna"]
 
 
 # ---------------------------------------------------------------- ReAct
@@ -327,6 +367,15 @@ def test_knowledge_backend_ranks_runbooks_and_recalls_lessons():
     assert "memory_search" not in kb.tools(memory=False)
     hybrid = KnowledgeBackend(search=lambda q: ["nope", "cart-failure"])
     assert [r["id"] for r in hybrid.runbook_search("x")] == ["cart-failure"]
+    assert (
+        KnowledgeBackend(search=lambda q: []).runbook_search("payment errors")[0]["id"] == "payment-failure"
+    )
+    assert (
+        KnowledgeBackend(search=lambda q: (_ for _ in ()).throw(RuntimeError("down"))).runbook_search(
+            "payment errors"
+        )[0]["id"]
+        == "payment-failure"
+    )
 
 
 def test_flag_ops_dry_run_and_restore_the_previous_variant():

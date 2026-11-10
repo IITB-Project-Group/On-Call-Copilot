@@ -44,3 +44,35 @@ prometheus:
               annotations:
                 summary: "{{ $labels.service_name }} has a request failing more than 5% of the time over 5 minutes."
                 expr: max by (service_name) (sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m])) / sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[5m])))
+        - name: copilot-agent
+          rules:
+            - alert: CopilotRepeatedRollbacks
+              expr: increase(copilot_agent_rollbacks_total[30m]) >= 2
+              labels: {severity: warning}
+              annotations:
+                summary: "The copilot rolled back two or more actions in 30 minutes; its fixes are not working."
+            - alert: CopilotReplanLoop
+              expr: increase(copilot_agent_replans_total[15m]) >= 3
+              labels: {severity: warning}
+              annotations:
+                summary: "The copilot replanned three or more times in 15 minutes."
+            - alert: CopilotIncidentHalted
+              expr: increase(copilot_agent_halted_total[15m]) > 0
+              labels: {severity: warning}
+              annotations:
+                summary: "A hook halted an incident; a person must take over."
+            - alert: CopilotBlockedProposals
+              expr: increase(copilot_agent_blocked_proposals_total[30m]) >= 3
+              labels: {severity: info}
+              annotations:
+                summary: "The guardrails refused three or more proposals in 30 minutes."
+            - alert: CopilotCostHigh
+              expr: increase(copilot_agent_cost_usd_total[1h]) > 2
+              labels: {severity: info}
+              annotations:
+                summary: "Model spend above 2 USD in the last hour."
+            - alert: CopilotSlowDiagnosis
+              expr: histogram_quantile(0.9, sum by (le) (rate(copilot_agent_time_to_diagnose_seconds_bucket[1h]))) > 600
+              labels: {severity: info}
+              annotations:
+                summary: "90th percentile time to diagnose is above 10 minutes."
