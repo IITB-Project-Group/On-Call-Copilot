@@ -274,6 +274,11 @@ def test_activity_is_visible_before_the_graph_has_a_checkpoint():
         "RAG · Searching runbooks: payment.",
         "Telemetry · Reading logs: checkout.",
     ]
+    service.note_activity("not-started", "Telemetry · Reading logs: checkout.")
+    assert [row["text"] for row in service.activity_log["not-started"]] == [
+        "RAG · Searching runbooks: payment.",
+        "Telemetry · Reading logs: checkout.",
+    ]
 
 
 def test_service_runs_to_each_decision_and_publishes_a_view():

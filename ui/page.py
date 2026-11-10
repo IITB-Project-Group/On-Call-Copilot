@@ -155,7 +155,7 @@ PAGE = """<!DOCTYPE html>
       color: var(--muted);
       font-size: 0.92rem;
     }
-    #activity-log li:first-of-type { color: var(--ink); font-weight: 560; }
+    #activity-log li:last-of-type { color: var(--ink); font-weight: 560; }
     #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
     #plan-block { margin-top: 1.1rem; padding-top: 0.85rem; border-top: 1px solid var(--line); }
     #agent h3, #diagnosis h3, #plan-block h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
@@ -677,7 +677,8 @@ PAGE = """<!DOCTYPE html>
     function renderActivityLog(view) {
       const wrap = document.querySelector("#activity-log");
       const node = document.querySelector("#activity-log-items");
-      const rows = (view.activity_log || []).slice().reverse().slice(0, 8);
+      // Chronological: oldest → newest. Newest-first made LLM/tool pairs look shuffled.
+      const rows = (view.activity_log || []).slice(-12);
       wrap.hidden = !rows.length;
       node.replaceChildren();
       for (const row of rows) {

@@ -82,8 +82,10 @@ class AgentService:
         """Show the tool / LLM step the agent is on. The graph only checkpoints when a step finishes."""
         self.activity[incident_id] = text
         log = self.activity_log.setdefault(incident_id, [])
-        log.append({"ts": time.time(), "text": text})
-        del log[:-_ACTIVITY_LOG_LIMIT]
+        # Skip consecutive duplicates so republishes do not pad or reshuffle the timeline.
+        if not (log and log[-1].get("text") == text):
+            log.append({"ts": time.time(), "text": text})
+            del log[:-_ACTIVITY_LOG_LIMIT]
         if self.publish_fn is None:
             return
         view = self.view(incident_id)
