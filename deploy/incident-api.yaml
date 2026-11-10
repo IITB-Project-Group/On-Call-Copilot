@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: incident-data
+  namespace: otel-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,11 +65,34 @@ spec:
             # Model ids come from the copilot-models ConfigMap. The image file is the fallback.
             - name: COPILOT_MODELS_FILE
               value: /etc/copilot/models.yaml
+            # Guardrail spans go to the shop collector. Jaeger service name is incident-api.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4318
+            - name: OTEL_SERVICE_NAME
+              value: incident-api
+            # Same key as the agent. The entrypoint builds the Chroma corpus when this is set.
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openrouter
+                  key: api-key
+                  optional: true
+            - name: EMBEDDING_MODEL
+              value: baai/bge-m3
+            - name: EMBEDDING_PROVIDER
+              value: openrouter
+            - name: COPILOT_CHROMA_DIR
+              value: /data/chroma
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 2
             periodSeconds: 5
           volumeMounts:
             - name: data
@@ -70,10 +105,11 @@ spec:
               cpu: 50m
               memory: 256Mi
             limits:
-              memory: 512Mi
+              memory: 1536Mi
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: incident-data
         - name: models
           configMap:
             name: copilot-models

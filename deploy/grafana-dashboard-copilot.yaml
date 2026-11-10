@@ -1,0 +1,159 @@
+# Grafana sidecar loads every ConfigMap with label grafana_dashboard.
+# Datasource uid webstore-metrics is the shop Prometheus, already provisioned by the demo chart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-copilot
+  namespace: otel-demo
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: opentelemetry-demo
+data:
+  copilot-agent.json: |
+    {
+      "uid": "oncall-copilot",
+      "title": "On-Call Copilot",
+      "tags": ["copilot", "agent"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": {"from": "now-6h", "to": "now"},
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Time to diagnose",
+          "description": "Mean seconds from the alert to a supported hypothesis, since this API process started.",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 0, "y": 0, "w": 5, "h": 6},
+          "fieldConfig": {"defaults": {"unit": "s", "decimals": 1}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none"},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(copilot_agent_time_to_diagnose_seconds_sum) / clamp_min(sum(copilot_agent_time_to_diagnose_seconds_count), 1)",
+            "legendFormat": "mean"
+          }]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Time to recover",
+          "description": "Mean seconds from the alert to verified recovery, since this API process started.",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 5, "y": 0, "w": 5, "h": 6},
+          "fieldConfig": {"defaults": {"unit": "s", "decimals": 1}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none"},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(copilot_agent_time_to_recover_seconds_sum) / clamp_min(sum(copilot_agent_time_to_recover_seconds_count), 1)",
+            "legendFormat": "mean"
+          }]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Tool calls per incident",
+          "description": "Mean tool calls recorded per incident.",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 10, "y": 0, "w": 5, "h": 6},
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 1}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none"},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(copilot_agent_tool_calls_per_incident_sum) / clamp_min(sum(copilot_agent_tool_calls_per_incident_count), 1)",
+            "legendFormat": "mean"
+          }]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Actions rolled back",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 15, "y": 0, "w": 4, "h": 6},
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none"},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(copilot_agent_rollbacks_total)",
+            "legendFormat": "rollbacks"
+          }]
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Model cost",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 19, "y": 0, "w": 5, "h": 6},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 4}, "overrides": []},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none"},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(copilot_agent_cost_usd_total)",
+            "legendFormat": "usd"
+          }]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Time to diagnose, p50 and p90",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(copilot_agent_time_to_diagnose_seconds_bucket[15m])))",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.9, sum by (le) (rate(copilot_agent_time_to_diagnose_seconds_bucket[15m])))",
+              "legendFormat": "p90"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Time to recover, p50 and p90",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(copilot_agent_time_to_recover_seconds_bucket[15m])))",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.9, sum by (le) (rate(copilot_agent_time_to_recover_seconds_bucket[15m])))",
+              "legendFormat": "p90"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Rollbacks and model cost",
+          "datasource": {"type": "prometheus", "uid": "webstore-metrics"},
+          "gridPos": {"x": 0, "y": 14, "w": 24, "h": 8},
+          "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(copilot_agent_rollbacks_total[15m]))",
+              "legendFormat": "rollbacks per 15m"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(increase(copilot_agent_cost_usd_total[15m]))",
+              "legendFormat": "cost USD per 15m"
+            }
+          ]
+        }
+      ]
+    }

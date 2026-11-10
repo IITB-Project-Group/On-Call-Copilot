@@ -132,6 +132,21 @@ def test_runtime_rejects_missing_documents_and_chunks(tmp_path):
         )
 
 
+def test_runtime_reads_the_chroma_directory_from_the_environment(tmp_path, monkeypatch):
+    seen = {}
+
+    class Store:
+        def __init__(self, encoder, persist_directory=None, collection_name="knowledge_passages"):
+            seen["path"] = persist_directory
+            self.count = 0
+
+    monkeypatch.setenv("COPILOT_CHROMA_DIR", str(tmp_path / "from-env"))
+    monkeypatch.setattr(runtime, "ChromaPassageStore", Store)
+    with pytest.raises(RuntimeError, match="index is empty"):
+        initialize_retrieval_service(knowledge_dir=_corpus(tmp_path), encoder=StubEncoder())
+    assert seen["path"] == str(tmp_path / "from-env")
+
+
 def test_runtime_requires_a_prebuilt_index(tmp_path):
     with pytest.raises(RuntimeError, match="index is empty"):
         initialize_retrieval_service(

@@ -19,6 +19,7 @@ from prometheus_client import (
 )
 from pydantic import BaseModel, Field
 
+from agents.observability import configure_tracing
 from api.safety_gate import FLAG_SERVICES, AlertRateLimiter, SafetyGate, screen_webhook
 from api.stream import snapshot_event
 from incident_api.store import DECISIONS, IncidentStore
@@ -82,6 +83,7 @@ class SecurityHeaders:
 
 
 def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastAPI:
+    configure_tracing()
     chosen = db_path or default_db_path()
     change_flag = set_flag if on_approve is None else on_approve
     store = IncidentStore(chosen)

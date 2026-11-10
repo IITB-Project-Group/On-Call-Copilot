@@ -14,7 +14,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
@@ -35,6 +35,30 @@ class Recorder:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(entry, default=str) + "\n")
         return entry
+
+
+def configure_tracing(env: Mapping[str, str] | None = None) -> bool:
+    """Export spans to the shop collector when OTEL_EXPORTER_OTLP_ENDPOINT is set.
+
+    Guardrail checks already call start_span. Without a provider those spans are discarded,
+    so Jaeger shows the shop and not the agent.
+    """
+    environ = os.environ if env is None else env
+    endpoint = environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
+    if not endpoint:
+        return False
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    service = environ.get("OTEL_SERVICE_NAME", "").strip() or "incident-api"
+    provider = TracerProvider(resource=Resource.create({"service.name": service}))
+    # The endpoint env is the collector base. The HTTP exporter appends /v1/traces.
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    return True
 
 
 def tracing_callbacks() -> list:
