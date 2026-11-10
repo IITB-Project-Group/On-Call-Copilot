@@ -831,16 +831,19 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderPayload(incident) {
-      const flag = writesFlag(incident);
-      payload.hidden = !flag;
-      effect.hidden = !flag;
-      if (!flag) return;
+      // Command + confirmation code belong only to action HITL. Comms/lessons keep the
+      // earlier proposal on the incident row, which used to leak into the note-review modal.
+      const pendingKind = incident.agent && incident.agent.pending && incident.agent.pending.kind;
+      const showCommand = pendingKind === "action" || (!isOpen(incident) && writesFlag(incident) && !pendingKind);
+      payload.hidden = !showCommand;
+      effect.hidden = !showCommand;
+      if (!showCommand) return;
       payload.replaceChildren();
       const proposal = incident.agent && incident.agent.proposal;
       const lines = proposal ? [proposal.command, "rollback: " + proposal.rollback_command, "severity: " + proposal.severity]
         : ["set_flag", "flag: paymentFailure", "value: off"];
       if (incident.proposed_command && !proposal) lines.push(incident.proposed_command);
-      if (incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
+      if (pendingKind === "action" && incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
       for (const line of lines) {
         const row = document.createElement("div");
         row.textContent = line;
@@ -910,6 +913,12 @@ PAGE = """<!DOCTYPE html>
         firing(incident) ? "firing" : ""
       );
       lead.textContent = leadFor(incident);
+      const decisionTitle = document.querySelector("#decision-title");
+      const titlePending = incident.agent && incident.agent.pending && incident.agent.pending.kind;
+      decisionTitle.textContent = titlePending === "comms" ? "Review status note"
+        : titlePending === "lessons" ? "Review lessons"
+        : titlePending === "action" ? "Approve this command"
+        : "Your decision";
       renderPayload(incident);
       renderReview(incident);
       renderEvents(incident);
