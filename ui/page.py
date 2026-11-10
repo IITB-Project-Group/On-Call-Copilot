@@ -686,6 +686,10 @@ PAGE = """<!DOCTYPE html>
       if (!open && incident.decision === "approve") return "Approved. The shop was left unchanged.";
       if (!open) return "Rejected. The shop was left unchanged.";
       if (view && view.pending && view.pending.kind === "action") {
+        const needed = Number(view.pending.required_approvals || 1);
+        if (needed > 1) {
+          return "SEV1 needs two different approvers. Type the code, approve as oncall, then switch Approver to incident-commander and approve again.";
+        }
         return "Type the code shown below, then approve. The command runs only after that.";
       }
       if (view && view.pending && view.pending.kind === "comms") {
@@ -722,10 +726,18 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderEvents(incident) {
-      const items = [[when(incident.starts_at), "Alert received."]];
+      const items = [];
+      const agentEvents = (incident.agent && incident.agent.events) || [];
+      if (agentEvents.length) {
+        for (const row of agentEvents) {
+          items.push([when(row.ts), row.what || "Update."]);
+        }
+      } else {
+        items.push([when(incident.starts_at), "Alert received."]);
+      }
       if (incident.decision === "edit") {
         items.push([when(incident.updated_at), "Note saved. Earlier approval cleared."]);
-      } else if (incident.decision === "approve") {
+      } else if (incident.decision === "approve" && !(incident.agent && incident.agent.running)) {
         items.push([when(incident.updated_at), "Approved. The note below is what was stored."]);
       } else if (incident.decision === "reject") {
         items.push([when(incident.updated_at), "Rejected. The shop was left unchanged."]);
@@ -786,9 +798,12 @@ PAGE = """<!DOCTYPE html>
         : pendingKind === "lessons" ? "Approve these lessons"
         : writesFlag(incident) ? "Approve this command"
         : "Approve and close";
+      const needsTwo = pendingKind === "action" && Number((incident.agent.pending || {}).required_approvals || 1) > 1;
       document.querySelector("#decision-hint").textContent = pendingKind === "comms" || pendingKind === "lessons"
         ? "Reject leaves this unpublished and keeps the incident open."
-        : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
+        : needsTwo
+          ? "Use two different Approver ids (oncall, then incident-commander). Approving twice as oncall does nothing."
+          : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
     }
 
     function renderReview(incident) {
@@ -973,9 +988,20 @@ PAGE = """<!DOCTYPE html>
           return;
         }
         show(body);
-        message.textContent = decisionName === "edit"
-          ? "Saved. The earlier approval was cleared."
-          : "Recorded. This incident stays open for the next step.";
+        const stillAction = body.agent && body.agent.pending && body.agent.pending.kind === "action";
+        const lastWhat = ((body.agent && body.agent.events) || []).slice(-1)[0];
+        const approvalNote = lastWhat && String(lastWhat.what || "");
+        if (decisionName === "edit") {
+          message.textContent = "Saved. The earlier approval was cleared.";
+        } else if (stillAction && /duplicate_approver/.test(approvalNote)) {
+          message.textContent = "Same approver already voted. Switch Approver to incident-commander, then approve again.";
+        } else if (stillAction && /awaiting_second_approver|Approval not complete/.test(approvalNote)) {
+          message.textContent = "First vote recorded. Switch Approver to a different id (incident-commander), then approve again.";
+        } else if (stillAction) {
+          message.textContent = "Recorded. This command still needs approval before it runs.";
+        } else {
+          message.textContent = "Recorded. This incident stays open for the next step.";
+        }
         loadList();
       } finally {
         sending = false;
