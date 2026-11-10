@@ -184,6 +184,7 @@ else
 fi
 unset OPENROUTER_API_KEY
 kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/incident-api.yaml"
+kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/grafana-dashboard-copilot.yaml"
 if (( secret_updated == 1 )); then
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout restart deployment/incident-api
 fi

@@ -37,6 +37,7 @@ Cluster manifests live in `deploy/`:
 | --- | --- |
 | `shop-values.yaml` | Helm values for the Astronomy Shop |
 | `agent-alert-rules.yaml` | Prometheus rules for the agent |
+| `grafana-dashboard-copilot.yaml` | Grafana panels for diagnose time, recovery, tool calls, rollbacks, and cost |
 | `incident-api.yaml` | Incident API deployment and service |
 | `copilot-models.yaml` | Model ids, mounted into the API |
 | `openrouter-secret.example.yaml` | Template for the OpenRouter key |
