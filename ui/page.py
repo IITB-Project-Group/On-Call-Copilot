@@ -100,6 +100,20 @@ PAGE = """<!DOCTYPE html>
       line-height: 1.4;
     }
     .kicker { margin: 1.35rem 0 0.4rem; font-weight: 600; }
+    .detail-section {
+      margin-top: 1.65rem;
+      padding: 1.05rem 1.15rem 1.2rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      max-width: 42rem;
+    }
+    .detail-section > h2:first-child {
+      margin: 0 0 0.75rem;
+      padding-bottom: 0.55rem;
+      border-bottom: 1px solid var(--line);
+    }
+    #agent[hidden] { display: none; }
+    #checked { margin-top: 1.85rem; }
     #pending { margin: 0.45rem 0 0; font-size: 1.05rem; }
     #live-panel { margin: 0.35rem 0 1rem; max-width: 42rem; }
     #live, #live-activity {
@@ -143,8 +157,9 @@ PAGE = """<!DOCTYPE html>
     }
     #activity-log li:first-of-type { color: var(--ink); font-weight: 560; }
     #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
-    #plan-block { margin-top: 1.1rem; }
-    #plan-block h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    #plan-block { margin-top: 1.1rem; padding-top: 0.85rem; border-top: 1px solid var(--line); }
+    #agent h3, #plan-block h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
+    #plan-block h3 { margin-top: 0; }
     #plan-focus { margin: 0 0 0.45rem; }
     #plan-why summary {
       display: inline-flex;
@@ -349,7 +364,7 @@ PAGE = """<!DOCTYPE html>
         <h2>Issue</h2>
         <p id="issue"></p>
         <p id="alert" class="meta"></p>
-        <div id="agent" hidden>
+        <section id="agent" class="detail-section" hidden aria-label="What the agent is doing">
           <h2>What the agent is doing</h2>
           <div id="live-panel">
             <div id="live" hidden>
@@ -377,19 +392,21 @@ PAGE = """<!DOCTYPE html>
               <p id="plan-reason"></p>
             </details>
           </div>
-          <h2>Likely causes</h2>
+          <h3>Likely causes</h3>
           <ol id="hypotheses"></ol>
-        </div>
+        </section>
         <div id="hitl-banner" class="hitl-banner" hidden>
           <p id="hitl-banner-text">Human approval is needed before the agent continues.</p>
           <button id="open-hitl" type="button">Review approval</button>
         </div>
-        <p class="kicker">What was checked</p>
-        <ol id="events" class="events"></ol>
-        <details>
-          <summary>Query checked</summary>
-          <pre id="expression"></pre>
-        </details>
+        <section id="checked" class="detail-section" aria-label="What was checked">
+          <h2>What was checked</h2>
+          <ol id="events" class="events"></ol>
+          <details>
+            <summary>Query checked</summary>
+            <pre id="expression"></pre>
+          </details>
+        </section>
       </div>
     </section>
   </main>
