@@ -400,14 +400,14 @@ PAGE = """<!DOCTYPE html>
         <button id="close-hitl" class="modal-close" type="button" aria-label="Close approval dialog">Close</button>
       </div>
       <p id="lead"></p>
-      <p id="shown-code" hidden></p>
       <div id="review-note" hidden></div>
       <div id="payload" class="payload" hidden></div>
       <p id="effect" class="effect" hidden></p>
       <form id="decision-form">
         <div id="code-fields">
-        <label for="confirmation">Confirmation code</label>
-        <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
+          <p id="shown-code" hidden></p>
+          <label for="confirmation">Confirmation code</label>
+          <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
         </div>
         <label for="approver">Approver</label>
         <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
@@ -742,9 +742,9 @@ PAGE = """<!DOCTYPE html>
       if (view && view.pending && view.pending.kind === "action") {
         const needed = Number(view.pending.required_approvals || 1);
         if (needed > 1) {
-          return "SEV1 needs two different approvers. Type the code, approve as oncall, then switch Approver to incident-commander and approve again.";
+          return "Type the confirmation code below. SEV1 needs two different approvers: approve as oncall, then switch Approver to incident-commander and approve again.";
         }
-        return "Type the code shown below, then approve. The command runs only after that.";
+        return "Type the confirmation code below, then approve. The command runs only after that.";
       }
       if (view && view.pending && view.pending.kind === "comms") {
         return view.outcome === "escalated"
@@ -848,12 +848,18 @@ PAGE = """<!DOCTYPE html>
       expression.textContent = plainText(incident.expression) || "No query was stored with this alert.";
       const shownCode = document.querySelector("#shown-code");
       const pendingKind = incident.agent && incident.agent.pending && incident.agent.pending.kind;
-      const waitingForCode = open && pendingKind === "action" && incident.confirmation_code;
+      const actionCode = String(incident.confirmation_code || "").trim();
+      // Always show the code entry for action HITL. Do not gate on confirmation_code being
+      // present yet — a brief publish race used to hide the whole field.
+      const waitingForCode = open && pendingKind === "action";
       document.querySelector("#code-fields").hidden = !waitingForCode;
       shownCode.hidden = !waitingForCode;
-      shownCode.textContent = waitingForCode ? "Code to type: " + incident.confirmation_code : "";
+      shownCode.textContent = waitingForCode
+        ? (actionCode ? "Code to type: " + actionCode : "Type the confirmation code for this command.")
+        : "";
       if (waitingForCode && document.activeElement !== confirmation) confirmation.value = "";
-      confirmation.placeholder = waitingForCode ? incident.confirmation_code : "Type the code shown with the command";
+      confirmation.placeholder = actionCode || "Type the code shown with the command";
+      confirmation.required = waitingForCode;
       command.readOnly = !open;
       const stillWorking = incident.agent && incident.agent.running && !(incident.agent.pending);
       const waitingOnYou = Boolean(pendingKind);
