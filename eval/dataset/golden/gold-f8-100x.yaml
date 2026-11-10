@@ -1,0 +1,67 @@
+id: gold-f8-100x
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: emailMemoryLeak
+  variant: 100x
+  at: steady_state
+load: normal
+alert:
+  alert_name: EmailMemoryHigh
+  service: email
+ground_truth:
+  faults:
+  - service: email
+    fault_type: memory_leak
+    fix:
+      type: set_flag
+      args:
+        flag: emailMemoryLeak
+        enabled: false
+expected:
+  incident: true
+  severity: SEV4
+  knock_on_services: []
+  recovery:
+    metric: memory_growth
+    comparator: <
+    threshold: 0.1
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: email
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: email
+      fault_type: memory_leak
+      flag: emailMemoryLeak
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: emailMemoryLeak
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: emailMemoryLeak
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:memory_growth_ratio:5m
+      shows: memory_growth.email above 0.1
+    must_not_call: []
+    max_tool_calls: 10
+notes: Medium leak (100x).

@@ -1,0 +1,68 @@
+id: gold-f6-steady-raised
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: recommendationCacheFailure
+  variant: 'on'
+  at: steady_state
+load: raised
+alert:
+  alert_name: ServiceLatencyHigh
+  service: recommendation
+ground_truth:
+  faults:
+  - service: recommendation
+    fault_type: memory_leak
+    fix:
+      type: set_flag
+      args:
+        flag: recommendationCacheFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services:
+  - frontend
+  recovery:
+    metric: memory_growth
+    comparator: <
+    threshold: 0.1
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: recommendation
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: recommendation
+      fault_type: memory_leak
+      flag: recommendationCacheFailure
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: recommendationCacheFailure
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: recommendationCacheFailure
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:memory_growth_ratio:5m
+      shows: memory_growth.recommendation ~ 0.45
+    must_not_call: []
+    max_tool_calls: 10
+notes: 'F6 under raised load: do not scale it away.'

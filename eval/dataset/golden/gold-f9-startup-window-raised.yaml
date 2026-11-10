@@ -1,0 +1,74 @@
+id: gold-f9-startup-window-raised
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: adHighCpu
+  variant: 'on'
+  at: startup_window
+load: raised
+alert:
+  alert_name: ServiceLatencyHigh
+  service: ad
+ground_truth:
+  faults:
+  - service: ad
+    fault_type: resource_exhaustion
+    fix:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services:
+  - frontend
+  recovery:
+    metric: p95_latency_s
+    comparator: <
+    threshold: 1.0
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: ad
+  - type: scale_service
+    args:
+      service: ad
+      replicas: 3
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: ad
+      fault_type: resource_exhaustion
+      flag: adHighCpu
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:service_p95_latency_seconds:2m
+    - tool: promql_query
+      query: copilot:container_cpu_ratio
+      shows: cpu_ratio.ad ~ 0.98
+    must_not_call: []
+    max_tool_calls: 10
+notes: F9 in the startup burst under raised load; here pm-006 does apply.

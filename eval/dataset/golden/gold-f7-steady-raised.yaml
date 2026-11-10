@@ -1,0 +1,69 @@
+id: gold-f7-steady-raised
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: adFailure
+  variant: 'on'
+  at: steady_state
+load: raised
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: ad
+ground_truth:
+  faults:
+  - service: ad
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: adFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services: []
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: ad
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: ad
+      fault_type: error_injection
+      flag: adFailure
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: adFailure
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: adFailure
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:service_error_ratio:5m
+    - tool: trace_search
+      service: ad
+      shows: 'fetch ads failed: ad failure flag'
+    must_not_call: []
+    max_tool_calls: 10
+notes: F7 under raised load.

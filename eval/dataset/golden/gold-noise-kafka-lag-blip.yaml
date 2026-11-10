@@ -1,0 +1,44 @@
+id: gold-noise-kafka-lag-blip
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject: []
+load: normal
+alert:
+  alert_name: KafkaConsumerLagHigh
+  service: accounting
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  recovery: null
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: accounting
+  - type: restart_service
+    args:
+      service: frontend
+reference:
+  diagnosis:
+    no_fault: true
+    hypotheses: []
+  actions: []
+  outcome: no_action
+  trajectory:
+    must_call:
+    - tool: promql_query
+      query: copilot:service_error_ratio:5m
+    - tool: recent_changes
+    must_not_call:
+    - ops_set_flag
+    - ops_restart_service
+    - ops_scale_service
+    - ops_rollback_deploy
+    max_tool_calls: 10
+notes: 'Consumer lag alert with lag back at 5 records: no fault.'

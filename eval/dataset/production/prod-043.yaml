@@ -1,0 +1,77 @@
+id: prod-043
+split: dev
+source: production
+derived_from: dev-noise-startup-burst
+written_on: '2026-11-10'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: frontend
+noise: startup_burst
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+trace:
+  run: e4-memory-on-b20
+  experiment: e4-c2-memory-on-b20
+  architecture: c2
+  memory: true
+  budget: 20
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-noise-startup-burst-b2aaf8
+  path: eval/results/twin-model/traces/e4-memory-on-b20/dev-noise-startup-burst-b2aaf8.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: fail
+  failure_modes:
+  - false_alarm_not_closed
+  - harmful_proposed
+  outcome: escalated
+  top1_service: false
+  top1_fault: false
+  top3_service: false
+  correct_action: false
+  verified_recovery: false
+  severity_correct: false
+  harmful_actions: 1
+  unnecessary_actions: 1
+  blocked_proposals: 4
+  tool_calls: 22
+  cost_usd: 0.052252
+  latency_s: 63.462
+  top_hypotheses:
+  - service: frontend
+    fault_type: error_injection
+    flag: null
+    status: supported
+  - service: checkout
+    fault_type: error_injection
+    flag: null
+    status: supported
+  - service: checkout
+    fault_type: latency
+    flag: null
+    status: proposed
+  actions:
+  - null
+  - type: restart_service
+    args:
+      service: frontend
+  - type: set_flag
+    args:
+      flag: adManualGc
+      enabled: false
+  - null

@@ -1,0 +1,81 @@
+id: gold-f4-steady-normal
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: adManualGc
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceLatencyHigh
+  service: ad
+ground_truth:
+  faults:
+  - service: ad
+    fault_type: resource_exhaustion
+    fix:
+      type: set_flag
+      args:
+        flag: adManualGc
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services: []
+  recovery:
+    metric: p95_latency_s
+    comparator: <
+    threshold: 1.0
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: ad
+  - type: scale_service
+    args:
+      service: ad
+      replicas: 3
+  - type: set_flag
+    args:
+      flag: adHighCpu
+      enabled: false
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: ad
+      fault_type: resource_exhaustion
+      flag: adManualGc
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: adManualGc
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: adManualGc
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:service_p95_latency_seconds:2m
+    - tool: promql_query
+      query: copilot:gc_pause_ratio:5m
+      shows: gc_pause_ratio.ad ~ 0.42
+    must_not_call: []
+    max_tool_calls: 10
+  lessons:
+    must_reject:
+    - pm-006
+notes: Misleading lesson. Ad is slow from GC pauses with CPU at 0.55, so pm-006's high-CPU precondition fails and
+  adHighCpu is the wrong flag.

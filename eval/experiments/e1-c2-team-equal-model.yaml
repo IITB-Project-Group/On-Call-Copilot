@@ -1,0 +1,13 @@
+# E1, C2 with equal models: the same team as e1-c2-team, but the commander runs on the specialists'
+# model (openai/gpt-4.1-mini) instead of openai/gpt-4.1. This is the equal-model comparison from
+# docs/agents/evaluation.md (threats to validity, 3), and the configuration to use with an
+# OpenRouter key that does not allow openai/gpt-4.1.
+name: e1-c2-team-equal-model
+architecture: c2
+parallel: true
+memory: true
+budget: 10
+learn: false
+repeats: 3
+models:
+  commander: openai/gpt-4.1-mini

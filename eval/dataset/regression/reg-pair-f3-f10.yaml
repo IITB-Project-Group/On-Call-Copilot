@@ -1,0 +1,79 @@
+id: reg-pair-f3-f10
+split: dev
+source: regression
+derived_from: dev-pair-f3-f10
+written_on: '2026-11-10'
+inject:
+- flag: cartFailure
+  variant: 50%
+  at: steady_state
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: cart
+ground_truth:
+  faults:
+  - service: cart
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: cartFailure
+        enabled: false
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV1
+  knock_on_services:
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: cart
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    partial_fix: 8
+  failed_runs: 8 of 8
+  first_seen:
+    run: e1-c1-single
+    experiment: e1-c1-single
+    architecture: c1
+    memory: true
+    budget: 10
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-pair-f3-f10-308cbb
+    path: eval/results/twin-model/traces/e1-c1-single/dev-pair-f3-f10-308cbb.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e1-c1-single/dev-pair-f3-f10-308cbb.jsonl
+  - eval/results/twin-model/traces/e1-c2-single-investigator/dev-pair-f3-f10-a0b975.jsonl
+  - eval/results/twin-model/traces/e1-c2-team/dev-pair-f3-f10-28acc0.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b10/dev-pair-f3-f10-aeabbe.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b20/dev-pair-f3-f10-649010.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b5/dev-pair-f3-f10-d12a0b.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-pair-f3-f10-c7769a.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b5/dev-pair-f3-f10-316b87.jsonl
+  must: success
+  must_not_propose: []
+  status: open

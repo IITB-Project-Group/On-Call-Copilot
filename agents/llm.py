@@ -64,7 +64,9 @@ class ModelFactory:
         slot_name = MODEL_SLOT[role]
         if slot_name not in self._cache:
             model_id = self.model_id(role)
-            self._cache[slot_name] = self.builder(model_id, self.config["models"][slot_name], self.config)
+            slot = dict(self.config["models"][slot_name])
+            slot["temperature"] = self.experiment.temperature_for(slot_name, self.config)
+            self._cache[slot_name] = self.builder(model_id, slot, self.config)
         return self._cache[slot_name]
 
 

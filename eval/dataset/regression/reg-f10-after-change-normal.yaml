@@ -1,0 +1,63 @@
+id: reg-f10-after-change-normal
+split: dev
+source: regression
+derived_from: dev-f10-after-change-normal
+written_on: '2026-11-10'
+inject:
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: after_change
+load: normal
+alert:
+  alert_name: KafkaConsumerLagHigh
+  service: accounting
+ground_truth:
+  faults:
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV4
+  knock_on_services:
+  - fraud-detection
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: kafka_lag
+    comparator: <
+    threshold: 100
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    harmful_proposed: 1
+    wrong_top1_service: 1
+  failed_runs: 1 of 8
+  first_seen:
+    run: e4-memory-on-b20
+    experiment: e4-c2-memory-on-b20
+    architecture: c2
+    memory: true
+    budget: 20
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-f10-after-change-normal-ca3cc1
+    path: eval/results/twin-model/traces/e4-memory-on-b20/dev-f10-after-change-normal-ca3cc1.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-f10-after-change-normal-ca3cc1.jsonl
+  must: success
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  status: open

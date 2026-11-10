@@ -1,0 +1,69 @@
+id: reg-f1-10pct
+split: dev
+source: regression
+derived_from: dev-f1-10pct
+written_on: '2026-11-10'
+inject:
+- flag: paymentFailure
+  variant: 10%
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: checkout
+ground_truth:
+  faults:
+  - service: payment
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: paymentFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV2
+  knock_on_services:
+  - checkout
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: payment
+  - type: restart_service
+    args:
+      service: checkout
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    harmful_proposed: 2
+    unverified_recovery: 2
+    wrong_top1_service: 2
+  failed_runs: 2 of 8
+  first_seen:
+    run: e4-memory-off-b5
+    experiment: e4-c2-memory-off-b5
+    architecture: c2
+    memory: false
+    budget: 5
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-f1-10pct-1feada
+    path: eval/results/twin-model/traces/e4-memory-off-b5/dev-f1-10pct-1feada.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e4-memory-off-b5/dev-f1-10pct-1feada.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b5/dev-f1-10pct-c4a4d8.jsonl
+  must: success
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  status: open

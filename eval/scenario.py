@@ -113,7 +113,8 @@ class ShopTwin:
     # -------------------------------------------------------------- the shop's state
     def _active(self) -> dict[str, float]:
         out = {}
-        for flag, variant in self.flags.items():
+        # Sorted: self.flags is built from a frozenset, whose order changes with the hash seed.
+        for flag, variant in sorted(self.flags.items()):
             if variant != "off":
                 out[flag] = intensity(variant)
             elif (
@@ -159,9 +160,11 @@ class ShopTwin:
             elif flag == "adFailure":
                 e["ad"] = 0.1
             elif flag == "adHighCpu":
-                m["cpu_ratio"]["ad"], lat["ad"], lat["frontend"] = 0.98, 1.8, max(lat["frontend"], 0.7)
+                m["cpu_ratio"]["ad"] = max(m["cpu_ratio"]["ad"], 0.98)
+                lat["ad"], lat["frontend"] = max(lat["ad"], 1.8), max(lat["frontend"], 0.7)
             elif flag == "adManualGc":
-                m["gc_pause_ratio"]["ad"], lat["ad"], m["cpu_ratio"]["ad"] = 0.42, 2.4, 0.55
+                m["gc_pause_ratio"]["ad"], lat["ad"] = 0.42, max(lat["ad"], 2.4)
+                m["cpu_ratio"]["ad"] = max(m["cpu_ratio"]["ad"], 0.55)
             elif flag == "recommendationCacheFailure":
                 m["memory_growth"]["recommendation"], lat["recommendation"] = 0.45, 1.4
                 lat["frontend"] = max(lat["frontend"], 0.9)

@@ -1,0 +1,89 @@
+id: prod-002
+split: dev
+source: production
+derived_from: dev-f1-100pct
+written_on: '2026-11-10'
+inject:
+- flag: paymentFailure
+  variant: 100%
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: checkout
+ground_truth:
+  faults:
+  - service: payment
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: paymentFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV1
+  knock_on_services:
+  - checkout
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: payment
+  - type: restart_service
+    args:
+      service: checkout
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+trace:
+  run: e4-memory-off-b20
+  experiment: e4-c2-memory-off-b20
+  architecture: c2
+  memory: false
+  budget: 20
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-f1-100pct-b1cb3c
+  path: eval/results/twin-model/traces/e4-memory-off-b20/dev-f1-100pct-b1cb3c.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: pass
+  failure_modes: []
+  outcome: resolved
+  top1_service: true
+  top1_fault: true
+  top3_service: true
+  correct_action: true
+  verified_recovery: true
+  severity_correct: true
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 28
+  cost_usd: 0.021287
+  latency_s: 30.592
+  top_hypotheses:
+  - service: payment
+    fault_type: error_injection
+    flag: paymentFailure
+    status: supported
+  - service: checkout
+    fault_type: error_injection
+    flag: null
+    status: proposed
+  - service: frontend
+    fault_type: error_injection
+    flag: null
+    status: proposed
+  actions:
+  - type: set_flag
+    args:
+      flag: paymentFailure
+      enabled: false

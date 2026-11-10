@@ -1,0 +1,66 @@
+id: reg-f10-startup-window-normal
+split: dev
+source: regression
+derived_from: dev-f10-startup-window-normal
+written_on: '2026-11-10'
+inject:
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: startup_window
+load: normal
+alert:
+  alert_name: KafkaConsumerLagHigh
+  service: accounting
+ground_truth:
+  faults:
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV4
+  knock_on_services:
+  - fraud-detection
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: kafka_lag
+    comparator: <
+    threshold: 100
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    harmful_proposed: 4
+    wrong_top1_service: 4
+  failed_runs: 4 of 8
+  first_seen:
+    run: e1-c2-team
+    experiment: e1-c2-team
+    architecture: c2
+    memory: true
+    budget: 10
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-f10-startup-window-normal-27d75c
+    path: eval/results/twin-model/traces/e1-c2-team/dev-f10-startup-window-normal-27d75c.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e1-c2-team/dev-f10-startup-window-normal-27d75c.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b20/dev-f10-startup-window-normal-41e24c.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-f10-startup-window-normal-05f4f0.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b5/dev-f10-startup-window-normal-0fc4c5.jsonl
+  must: success
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  status: open

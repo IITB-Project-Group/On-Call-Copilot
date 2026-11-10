@@ -1,0 +1,66 @@
+id: reg-f3-10pct
+split: dev
+source: regression
+derived_from: dev-f3-10pct
+written_on: '2026-11-10'
+inject:
+- flag: cartFailure
+  variant: 10%
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: cart
+ground_truth:
+  faults:
+  - service: cart
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: cartFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV2
+  knock_on_services:
+  - frontend
+  - checkout
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: cart
+  - type: restart_service
+    args:
+      service: valkey-cart
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    harmful_proposed: 1
+  failed_runs: 1 of 8
+  first_seen:
+    run: e4-memory-on-b20
+    experiment: e4-c2-memory-on-b20
+    architecture: c2
+    memory: true
+    budget: 20
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-f3-10pct-3c975d
+    path: eval/results/twin-model/traces/e4-memory-on-b20/dev-f3-10pct-3c975d.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-f3-10pct-3c975d.jsonl
+  must: success
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  status: open

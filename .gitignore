@@ -6,3 +6,8 @@ __pycache__/
 htmlcov/
 *.pdf
 opentelemetry-demo/
+
+# Local secrets and generated knowledge data
+.env
+.chroma/
+knowledge/memory/incidents.sqlite3

@@ -1,0 +1,58 @@
+id: reg-noise-startup-burst
+split: dev
+source: regression
+derived_from: dev-noise-startup-burst
+written_on: '2026-11-10'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: frontend
+noise: startup_burst
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+regression:
+  bugs:
+    false_alarm_not_closed: 8
+    harmful_proposed: 5
+  failed_runs: 8 of 8
+  first_seen:
+    run: e1-c1-single
+    experiment: e1-c1-single
+    architecture: c1
+    memory: true
+    budget: 10
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-noise-startup-burst-4dc5a2
+    path: eval/results/twin-model/traces/e1-c1-single/dev-noise-startup-burst-4dc5a2.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e1-c1-single/dev-noise-startup-burst-4dc5a2.jsonl
+  - eval/results/twin-model/traces/e1-c2-single-investigator/dev-noise-startup-burst-881837.jsonl
+  - eval/results/twin-model/traces/e1-c2-team/dev-noise-startup-burst-ac283f.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b10/dev-noise-startup-burst-464cd4.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b20/dev-noise-startup-burst-84af8d.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b5/dev-noise-startup-burst-2fed75.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-noise-startup-burst-b2aaf8.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b5/dev-noise-startup-burst-74b340.jsonl
+  must: outcome no_action
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  - type: restart_service
+    args:
+      service: frontend
+  status: open

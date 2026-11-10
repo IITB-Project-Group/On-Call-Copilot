@@ -1,0 +1,71 @@
+id: gold-f12-after-change
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: loadGeneratorFloodHomepage
+  variant: 'on'
+  at: after_change
+load: normal
+alert:
+  alert_name: HighP99Latency
+  service: frontend
+ground_truth:
+  faults:
+  - service: frontend
+    fault_type: traffic_surge
+    fix:
+      type: set_flag
+      args:
+        flag: loadGeneratorFloodHomepage
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services: []
+  recovery:
+    metric: request_rate
+    comparator: <
+    threshold: 50
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: frontend
+  - type: scale_service
+    args:
+      service: frontend
+      replicas: 3
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: frontend
+      fault_type: traffic_surge
+      flag: loadGeneratorFloodHomepage
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: loadGeneratorFloodHomepage
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: loadGeneratorFloodHomepage
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:service_request_rate:2m
+      shows: request_rate.frontend ~ 180/s
+    must_not_call: []
+    max_tool_calls: 10
+notes: F12 with an unrelated recent change, from the p99 latency rule.
