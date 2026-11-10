@@ -245,9 +245,17 @@ PAGE = """<!DOCTYPE html>
       border: 0;
       padding: 0.42rem 0.85rem;
     }
-    #close-finished {
-      margin: 1rem 0 0;
+    .title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
       max-width: 42rem;
+    }
+    .title-row h1 { margin: 0.2rem 0 0; flex: 1 1 auto; }
+    #close-finished {
+      margin: 0.35rem 0 0;
+      flex: 0 0 auto;
     }
     #close-finished[hidden] { display: none; }
     #close-finished button {
@@ -257,6 +265,7 @@ PAGE = """<!DOCTYPE html>
       color: var(--ink);
       border: 1px solid var(--line);
       padding: 0.35rem 0.7rem;
+      white-space: nowrap;
     }
     .decision {
       position: fixed;
@@ -375,7 +384,12 @@ PAGE = """<!DOCTYPE html>
     <section id="detail">
       <p id="message" class="hint" aria-live="polite"></p>
       <p id="state" class="meta">Approved and rejected incidents stay on Closed.</p>
-      <h1 id="title">No open incidents</h1>
+      <div class="title-row">
+        <h1 id="title">No open incidents</h1>
+        <p id="close-finished" hidden>
+          <button id="open-close" type="button">Close this incident</button>
+        </p>
+      </div>
       <div id="stream" hidden>
         <p id="now"></p>
         <ol id="stages" aria-label="Where this incident is"></ol>
@@ -420,9 +434,6 @@ PAGE = """<!DOCTYPE html>
           <p id="hitl-banner-text">Human approval is needed before the agent continues.</p>
           <button id="open-hitl" type="button">Review approval</button>
         </div>
-        <p id="close-finished" hidden>
-          <button id="open-close" type="button">Close this incident</button>
-        </p>
         <section id="checked" class="detail-section" aria-label="What was checked">
           <h2>What was checked</h2>
           <ol id="events" class="events"></ol>
