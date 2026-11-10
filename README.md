@@ -188,4 +188,15 @@ First integrated milestone: `paymentFailure` only, from alert to approved flag c
 
 ## Status
 
-The Astronomy Shop and the incident alert path run from `up.sh` on a local kind cluster. Runbooks, agents, and the evaluation harness are still to be built. The sections above are the build contract taken from the capstone architecture guide.
+The Astronomy Shop and the incident alert path run from `up.sh` on a local kind cluster. The sections above are the build contract taken from the capstone architecture guide.
+
+**Agents and orchestration** (role 3) are in `agents/` and `graph/`:
+
+- a LangGraph incident graph with a commander, triage, parallel diagnosis, runbook, remediation and comms specialists;
+- approvals through `interrupt()`;
+- verification with rollback and replan;
+- a SQLite checkpointer;
+- the C0 and C1 baselines;
+- Reflexion with lesson review and freezing.
+
+To run it, start the incident API with `COPILOT_AGENT=c2` and `OPENROUTER_API_KEY` set (`c0` needs no key). The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).

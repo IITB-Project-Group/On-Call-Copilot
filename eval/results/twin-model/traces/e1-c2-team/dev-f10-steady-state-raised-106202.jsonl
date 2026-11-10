@@ -1,0 +1,1 @@
+{"ts": 1794137411.061, "incident": "dev-f10-steady-state-raised-106202", "kind": "incident", "alert": {"alert_name": "KafkaConsumerLagHigh", "service": "accounting", "starts_at": "2026-11-08T11:10:40+00:00"}, "experiment": "e1-c2-team", "config": "2026-11-08.4", "models": {"commander": "openai/gpt-4.1", "specialist": "openai/gpt-4.1-mini"}}

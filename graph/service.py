@@ -1,0 +1,146 @@
+"""Run incident graphs inside the incident API: start on an alert, resume on a decision.
+
+Each incident is one LangGraph thread (thread id = incident id) in a SQLite checkpointer, so a
+restarted API resumes every run that was mid-step (``resume_unfinished``) and keeps every run
+that was waiting for a person. ``view`` is what the console shows: the plan and its versions,
+the ranked hypotheses, the pending decision and the outcome.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+from collections.abc import Callable
+from typing import Any
+
+from langgraph.types import Command
+
+from agents.observability import AgentMetrics, tracing_callbacks
+from graph.incident_graph import GraphDeps, build_graph
+
+logger = logging.getLogger(__name__)
+
+
+class AgentService:
+    def __init__(
+        self,
+        deps: GraphDeps,
+        checkpointer,
+        *,
+        run_async: bool = True,
+        metrics: AgentMetrics | None = None,
+        publish: Callable[[str, dict], None] | None = None,
+    ):
+        self.deps, self.graph = deps, build_graph(deps, checkpointer)
+        self.run_async, self.metrics, self.publish_fn = run_async, metrics, publish
+        self._locks: dict[str, threading.Lock] = {}
+        self._threads: list[threading.Thread] = []
+        self.errors: dict[str, str] = {}
+
+    def _config(self, incident_id: str) -> dict:
+        return {"configurable": {"thread_id": incident_id}, "callbacks": tracing_callbacks()}
+
+    def handles(self, incident_id: str) -> bool:
+        return bool(self.graph.get_state(self._config(incident_id)).values)
+
+    def start(self, incident_id: str, alert: dict) -> None:
+        self._run(incident_id, {"incident_id": incident_id, "alert": alert})
+
+    def resume(self, incident_id: str, decision: dict) -> None:
+        self._run(incident_id, Command(resume=decision))
+
+    def resume_unfinished(self, incident_ids: list[str]) -> list[str]:
+        """Continue runs that stopped mid-step (process killed). Runs waiting for a person stay waiting."""
+        resumed = []
+        for incident_id in incident_ids:
+            snapshot = self.graph.get_state(self._config(incident_id))
+            if snapshot.values and snapshot.next and not snapshot.interrupts:
+                self._run(incident_id, None)
+                resumed.append(incident_id)
+        return resumed
+
+    def wait(self, timeout: float = 30.0) -> None:
+        for thread in list(self._threads):
+            thread.join(timeout)
+
+    def _run(self, incident_id: str, value: Any) -> None:
+        if self.run_async:
+            thread = threading.Thread(target=self._invoke, args=(incident_id, value), daemon=True)
+            self._threads.append(thread)
+            thread.start()
+        else:
+            self._invoke(incident_id, value)
+
+    def _invoke(self, incident_id: str, value: Any) -> None:
+        lock = self._locks.setdefault(incident_id, threading.Lock())
+        with lock:
+            try:
+                self.graph.invoke(value, self._config(incident_id))
+                self.errors.pop(incident_id, None)
+            except Exception as exc:  # the console shows the failure; the checkpoint keeps the last good step
+                logger.exception("incident graph failed for %s", incident_id)
+                self.errors[incident_id] = f"{type(exc).__name__}: {exc}"
+            self.publish(incident_id)
+
+    def pending(self, incident_id: str) -> dict | None:
+        snapshot = self.graph.get_state(self._config(incident_id))
+        return snapshot.interrupts[0].value if snapshot.interrupts else None
+
+    def view(self, incident_id: str) -> dict:
+        snapshot = self.graph.get_state(self._config(incident_id))
+        state = snapshot.values or {}
+        pending = snapshot.interrupts[0].value if snapshot.interrupts else None
+        proposal = state.get("proposal") or {}
+        return {
+            "status": state.get("status"),
+            "outcome": state.get("outcome"),
+            "plan": state.get("plan"),
+            "plan_versions": [
+                {"version": p["version"], "focus": p["focus"], "reason": p["reason"]}
+                for p in state.get("plan_history") or []
+            ],
+            "hypotheses": (state.get("diagnosis") or {}).get("hypotheses", [])[:3],
+            "proposal": {k: proposal.get(k) for k in ("command", "rollback_command", "severity", "rationale")}
+            if proposal
+            else None,
+            "verification": state.get("verification"),
+            "pending": None
+            if pending is None
+            else {
+                "kind": pending["kind"],
+                **{
+                    k: v
+                    for k, v in pending.items()
+                    if k in ("command", "external", "lessons", "required_approvals")
+                },
+            },
+            "events": (state.get("events") or [])[-15:],
+            "running": bool(snapshot.next) and not snapshot.interrupts,
+            "error": self.errors.get(incident_id),
+        }
+
+    def publish(self, incident_id: str) -> None:
+        view = self.view(incident_id)
+        if self.publish_fn is not None:
+            self.publish_fn(incident_id, view)
+        if (
+            self.metrics is not None
+            and not view["running"]
+            and view["pending"] is None
+            and incident_id in self.deps.sessions
+        ):
+            session = self.deps.sessions[incident_id]
+            hook = session.executor.mgr.state(incident_id)
+            marks = {k: v - hook.started for k, v in hook.marks.items()}
+            self.metrics.observe(
+                {
+                    "outcome": view["outcome"],
+                    "time_to_diagnose_s": marks.get("diagnosed"),
+                    "time_to_recover_s": marks.get("recovered"),
+                    "tool_calls": hook.tool_calls,
+                    "rollbacks": hook.rollbacks,
+                    "replans": hook.replans,
+                    "cost_usd": hook.cost_usd,
+                    "halt_reason": hook.halt_reason,
+                }
+            )

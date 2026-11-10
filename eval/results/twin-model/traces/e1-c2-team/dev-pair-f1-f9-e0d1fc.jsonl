@@ -1,0 +1,1 @@
+{"ts": 1794137426.563, "incident": "dev-pair-f1-f9-e0d1fc", "kind": "incident", "alert": {"alert_name": "ServiceErrorRateHigh", "service": "checkout", "starts_at": "2026-11-08T11:10:56+00:00"}, "experiment": "e1-c2-team", "config": "2026-11-08.4", "models": {"commander": "openai/gpt-4.1", "specialist": "openai/gpt-4.1-mini"}}

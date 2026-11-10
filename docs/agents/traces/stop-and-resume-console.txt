@@ -1,0 +1,77 @@
+$ python -m graph.cli run --workdir demo --case dev-f1-50pct --arch c0 --crash-after assess
+step done: intake
+step done: plan
+step done: fixed
+step done: assess
+simulated crash after assess; run `resume` to continue
+(exit 3)
+
+$ python -m graph.cli resume --workdir demo
+step done: runbook
+step done: propose
+step done: __interrupt__
+{
+  "next": [
+    "approve"
+  ],
+  "status": "waiting_approval",
+  "outcome": null,
+  "plan_version": 1,
+  "pending": {
+    "kind": "action",
+    "command": "ops-actions set_flag --enabled false --flag paymentFailure",
+    "confirmation_code": "0A0447AA"
+  }
+}
+(exit 0)
+
+$ python -m graph.cli decide --workdir demo --decision approve --approver eval-oncall --code 0A0447AA
+step done: approve
+step done: __interrupt__
+{
+  "next": [
+    "approve"
+  ],
+  "status": "waiting_approval",
+  "outcome": null,
+  "plan_version": 1,
+  "pending": {
+    "kind": "action",
+    "command": "ops-actions set_flag --enabled false --flag paymentFailure",
+    "confirmation_code": "0A0447AA"
+  }
+}
+(exit 0)
+
+$ python -m graph.cli decide --workdir demo --decision approve --approver eval-oncall-2 --code 0A0447AA
+step done: approve
+step done: act
+step done: verify
+step done: communicate
+step done: __interrupt__
+{
+  "next": [
+    "review"
+  ],
+  "status": "waiting_review",
+  "outcome": "resolved",
+  "plan_version": 1,
+  "pending": {
+    "kind": "comms",
+    "command": null,
+    "confirmation_code": null
+  }
+}
+(exit 0)
+
+$ python -m graph.cli decide --workdir demo --decision approve
+step done: review
+step done: learn
+{
+  "next": [],
+  "status": "resolved",
+  "outcome": "resolved",
+  "plan_version": 1,
+  "pending": null
+}
+(exit 0)

@@ -183,7 +183,13 @@ class SafetyGate:
         self.write_flag = write_flag
         self.audit = PersistentAuditLog(audit_path)
         self.approvals = ApprovalService(
-            ApproverRoster([Approver("oncall", frozenset({"oncall"}))]),
+            ApproverRoster(
+                [
+                    Approver("oncall", frozenset({"oncall"})),
+                    # A second person for SEV1 dual control and for approving external status notes.
+                    Approver("incident-commander", frozenset({"incident_commander", "comms_lead"})),
+                ]
+            ),
             audit=self.audit,
         )
         self.ig = input_guardrails(None)

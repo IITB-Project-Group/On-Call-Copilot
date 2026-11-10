@@ -1,0 +1,1 @@
+{"ts": 1794137423.656, "incident": "dev-noise-flagd-stream-fd2fed", "kind": "incident", "alert": {"alert_name": "ServiceErrorRateHigh", "service": "flagd", "starts_at": "2026-11-08T11:10:53+00:00"}, "experiment": "e1-c2-team", "config": "2026-11-08.4", "models": {"commander": "openai/gpt-4.1", "specialist": "openai/gpt-4.1-mini"}}

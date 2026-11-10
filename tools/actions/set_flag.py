@@ -18,6 +18,15 @@ def set_payment_failure_off() -> str:
     return set_flag("paymentFailure", "off")
 
 
+def read_flags() -> dict[str, str]:
+    """Return each flag's current default variant. The remediation dry run reads this."""
+    ui_url = os.environ.get("FLAGD_UI_URL", "http://localhost:4000").rstrip("/")
+    flags = _request("GET", f"{ui_url}/api/read").get("flags")
+    if not isinstance(flags, dict):
+        raise FlagWriteError("flag document has no flags")
+    return {name: str(item.get("defaultVariant")) for name, item in flags.items() if isinstance(item, dict)}
+
+
 def set_flag(flag: str, variant: str) -> str:
     ui_url = os.environ.get("FLAGD_UI_URL", "http://localhost:4000").rstrip("/")
     ofrep_url = os.environ.get("FLAGD_OFREP_URL", "http://localhost:8016").rstrip("/")

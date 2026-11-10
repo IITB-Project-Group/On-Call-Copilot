@@ -172,9 +172,17 @@ class IncidentStore:
                 return None
         return self.get(incident_id)
 
+    def set_agent(self, incident_id: str, view: dict) -> None:
+        """Store what the agent graph shows for this incident: plan, hypotheses, pending decision."""
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE incidents SET agent_json = ? WHERE id = ?",
+                (json.dumps(view, default=str), incident_id),
+            )
+
     def _ensure_columns(self, connection: sqlite3.Connection) -> None:
         present = {row[1] for row in connection.execute("PRAGMA table_info(incidents)")}
-        for name in ("approval_request_id", "confirmation_code", "proposed_command"):
+        for name in ("approval_request_id", "confirmation_code", "proposed_command", "agent_json"):
             if name not in present:
                 connection.execute(f"ALTER TABLE incidents ADD COLUMN {name} TEXT")
 
@@ -205,4 +213,5 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "approval_request_id": row["approval_request_id"],
         "confirmation_code": row["confirmation_code"],
         "proposed_command": row["proposed_command"],
+        "agent": json.loads(row["agent_json"]) if row["agent_json"] else None,
     }

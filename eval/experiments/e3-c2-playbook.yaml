@@ -1,0 +1,10 @@
+# E3 "after": the same team with the reviewed, frozen playbook. Run held-out only after `python -m eval.playbook freeze`.
+name: e3-c2-playbook
+architecture: c2
+parallel: true
+memory: true
+budget: 10
+playbook: knowledge/playbook/playbook.yaml
+playbook_frozen: true
+learn: false
+repeats: 3

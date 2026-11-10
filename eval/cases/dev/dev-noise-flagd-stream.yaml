@@ -1,0 +1,25 @@
+id: dev-noise-flagd-stream
+split: dev
+written_by: role 3 (draft; role 1 to confirm)
+written_on: '2026-11-07'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: flagd
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: flagd
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+notes: flagd's EventStream span reports errors by design; no shop service is affected.
+noise: flagd_stream

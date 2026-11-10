@@ -1,0 +1,60 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	intake(intake)
+	plan(plan)
+	assess(assess)
+	replan(replan)
+	runbook(runbook)
+	propose(propose)
+	approve(approve)
+	act(act)
+	verify(verify)
+	rollback(rollback)
+	escalate(escalate)
+	no_fault(no_fault)
+	communicate(communicate)
+	review(review)
+	learn(learn)
+	investigate(investigate)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> intake;
+	act -.-> escalate;
+	act -.-> verify;
+	approve -.-> act;
+	approve -.-> escalate;
+	approve -.-> propose;
+	approve -.-> replan;
+	assess -.-> escalate;
+	assess -.-> no_fault;
+	assess -.-> replan;
+	assess -.-> runbook;
+	communicate --> review;
+	escalate --> communicate;
+	intake --> plan;
+	investigate --> assess;
+	no_fault --> communicate;
+	plan --> investigate;
+	propose -.-> approve;
+	propose -.-> escalate;
+	propose -.-> replan;
+	replan -.-> escalate;
+	replan -.-> investigate;
+	review -.-> learn;
+	rollback -.-> escalate;
+	rollback -.-> replan;
+	runbook --> propose;
+	verify -.-> communicate;
+	verify -.-> propose;
+	verify -.-> rollback;
+	learn --> __end__;
+	approve -.-> approve;
+	review -.-> review;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+

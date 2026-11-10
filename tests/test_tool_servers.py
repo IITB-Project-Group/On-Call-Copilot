@@ -4,6 +4,7 @@ import sys
 import types
 
 from agents.diagnosis import READ_TOOLS
+from agents.toolbox import MCP_TOOL_FOR
 from knowledge.retrieval.contracts import RetrievalResponse, RetrievedPassage, RetrievedRunbook
 from tools.actions import WRITE_ACTIONS
 from tools.runbooks import server as runbooks
@@ -59,7 +60,8 @@ def test_telemetry_tools_match_the_diagnosis_names_and_delegate(monkeypatch):
     assert server.service_latency_p95()["query"] == "latency"
     assert server.list_metric_names("span")["query"] == "span"
     assert set(server.TOOL_NAMES).isdisjoint(WRITE_ACTIONS)
-    assert {"promql", "logs", "traces", "recent_changes", "service_error_ratio"} <= set(READ_TOOLS)
+    assert {"promql_query", "log_search", "trace_search", "recent_changes"} <= set(READ_TOOLS)
+    assert set(MCP_TOOL_FOR.values()) <= set(server.TOOL_NAMES)
 
 
 def test_telemetry_server_registers_tools_without_installing_fastmcp(monkeypatch):

@@ -1,0 +1,27 @@
+# Lesson review for eval/reflexion/pending.jsonl (Reflexion on E1 C2, config 2026-11-08.5 reflection prompt).
+# Each line is a SUGGESTION from role 3. The reviewer reads every draft in pending.jsonl, changes any line they
+# disagree with, and then runs:
+#   python -m eval.playbook review --pending eval/reflexion/pending.jsonl --decisions eval/reflexion/decisions.yaml --reviewer <your name>
+# Write `approve` or `reject: <reason>`.
+
+# Disable paymentFailure when payment errors are high. No flag precondition, so it would also fire on
+# paymentUnreachable or any other payment fault and recommend the wrong flag (the misleading-lesson case).
+lesson-dev-f1-50pct: "reject: no flag.paymentFailure precondition, so it would mislead on other payment faults"
+
+# Blames checkout for a Kafka backlog incident and only advises escalating.
+lesson-dev-f10-startup-window-normal: "reject: wrong service (the fault was kafka) and it does not lead to a fix"
+
+# Kafka consumer lag on accounting points to the kafka backlog rather than restarting services.
+lesson-dev-f10-steady-state-raised: approve
+
+# Advises a deeper investigation of a flagd-only alert; flagd errors are noise and should be closed, not chased.
+lesson-dev-noise-flagd-stream: "reject: flagd-only errors are noise; the lesson pushes the wrong way"
+
+# Uses a precondition key the tools never record (flag.restart_service_unavailable); review marks it invalid.
+lesson-dev-noise-startup-burst: "reject: precondition key is not observable"
+
+# paymentFailure on and payment errors at or above 10%: switch the flag off. Preconditions pin the flag.
+lesson-dev-pair-f1-f9: approve
+
+# cartFailure on and cart errors at or above 10%: switch the flag off. Preconditions pin the flag.
+lesson-dev-pair-f3-f10: approve

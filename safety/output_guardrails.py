@@ -67,8 +67,10 @@ ROLE_TOOL_ALLOWLIST: dict[str, frozenset[str]] = {
     "comms": frozenset({"status_draft", "postmortem_draft", "status_publish_external", "trace_get"}),
     "memory": frozenset({"memory_write", "memory_search"}),
     "reflection": KB_TOOLS,
+    "investigator": READ_TOOLS | KB_TOOLS,         # single-agent baseline (C1): triage + diagnosis + runbook tools
 }
 assert not (ROLE_TOOL_ALLOWLIST["diagnosis"] & (WRITE_TOOLS | OPS_TOOLS)), "diagnosis must have no write tools"
+assert not (ROLE_TOOL_ALLOWLIST["investigator"] & (WRITE_TOOLS | OPS_TOOLS)), "investigator must have no write tools"
 
 TOOL_ARGS: dict[str, tuple[frozenset[str], frozenset[str]]] = {   # tool -> (required, optional)
     "promql_query": (frozenset({"query"}), frozenset({"time"})),

@@ -1,0 +1,8 @@
+# E1, C2: commander, triage, parallel diagnosis (one per suspect), runbook, remediation, comms.
+name: e1-c2-team
+architecture: c2
+parallel: true
+memory: true
+budget: 10
+learn: false
+repeats: 3

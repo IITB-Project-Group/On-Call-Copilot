@@ -1,0 +1,51 @@
+id: dev-pair-f1-f9
+split: dev
+written_by: role 3 (draft; role 1 to confirm)
+written_on: '2026-11-07'
+inject:
+- flag: paymentFailure
+  variant: 50%
+  at: steady_state
+- flag: adHighCpu
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: checkout
+ground_truth:
+  faults:
+  - service: payment
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: paymentFailure
+        enabled: false
+  - service: ad
+    fault_type: resource_exhaustion
+    fix:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: false
+expected:
+  incident: true
+  severity: SEV1
+  knock_on_services:
+  - checkout
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: payment
+  - type: restart_service
+    args:
+      service: ad
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+notes: Two faults at once; both fixes are expected, payment first.

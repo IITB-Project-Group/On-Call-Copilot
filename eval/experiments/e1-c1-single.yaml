@@ -1,0 +1,8 @@
+# E1, C1: one ReAct agent with every read and knowledge tool and the whole investigation budget.
+name: e1-c1-single
+architecture: c1
+parallel: false
+memory: true
+budget: 10
+learn: false
+repeats: 3

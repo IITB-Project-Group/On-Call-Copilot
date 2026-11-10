@@ -1,0 +1,8 @@
+# E3 "before": the team without Reflexion lessons. Also the configuration Reflexion runs on (dev only).
+name: e3-c2-no-playbook
+architecture: c2
+parallel: true
+memory: true
+budget: 10
+learn: false
+repeats: 3

@@ -1,0 +1,8 @@
+# E1 (On-Call specific): the team with one diagnosis agent for all suspects instead of one per suspect.
+name: e1-c2-single-investigator
+architecture: c2
+parallel: false
+memory: true
+budget: 10
+learn: false
+repeats: 3

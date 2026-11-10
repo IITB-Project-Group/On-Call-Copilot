@@ -1,0 +1,20 @@
+{
+  "experiment": "e4-c2-memory-off",
+  "runs": 20,
+  "errors": 0,
+  "success": 0.5,
+  "top1_service": 0.65,
+  "top3_service": 0.8,
+  "top1_fault": 0.7,
+  "top3_fault": 0.8,
+  "correct_action": 0.65,
+  "verified_recovery": 0.667,
+  "severity_correct": 0.7,
+  "harmful_actions": 20,
+  "unnecessary_actions": 6,
+  "blocked_proposals": 26,
+  "mean_tool_calls": 17.9,
+  "cost_usd_total": 0.4505,
+  "latency_p50_s": 29.269,
+  "latency_p95_s": 64.95
+}
