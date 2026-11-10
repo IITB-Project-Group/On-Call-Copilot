@@ -228,6 +228,13 @@ def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastA
         """Resume the incident graph with the engineer's decision on whatever it is waiting for."""
         pending = agent.pending(incident_id)
         if pending is None:
+            view = agent.view(incident_id)
+            if view.get("running"):
+                raise HTTPException(status_code=409, detail="the agent is still working")
+            # Graph finished (often escalated) but the incident row is still open: allow close.
+            if body.decision in ("approve", "reject"):
+                updated = store.decide(incident_id, body.decision, body.text) or current
+                return {**updated, "agent": view}
             raise HTTPException(status_code=409, detail="the agent is not waiting for a decision")
         if body.decision == "edit" and not body.text.strip():
             raise HTTPException(status_code=400, detail="edit requires text")

@@ -413,7 +413,10 @@ def test_api_runs_the_agent_and_resumes_on_decisions(tmp_path, monkeypatch):
         f"/incidents/{iid}/decision", json={"decision": "approve", "approver": "incident-commander"}
     ).json()
     assert done["agent"]["outcome"] == "resolved"
-    assert api.post(f"/incidents/{iid}/decision", json={"decision": "approve"}).status_code == 409
+    # Graph finished with no pending interrupt: approve/reject closes the open incident row.
+    closed = api.post(f"/incidents/{iid}/decision", json={"decision": "approve"})
+    assert closed.status_code == 200 and closed.json()["decision"] == "approve"
+    assert api.post(f"/incidents/{iid}/decision", json={"decision": "edit", "text": "note"}).status_code == 409
 
 
 def test_live_agent_copies_ticket_drafts_into_the_store(tmp_path, monkeypatch):

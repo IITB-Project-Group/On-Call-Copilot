@@ -186,6 +186,18 @@ def _plan(state: dict, **statuses: str) -> dict:
     return plan
 
 
+def _close_remediation_plan(state: dict) -> dict:
+    """Stop showing Propose as current once remediation is abandoned (blocked → escalate)."""
+    statuses: dict[str, str] = {}
+    for step in (state.get("plan") or {}).get("steps", []):
+        name, status = step["name"], step["status"]
+        if name == "propose" and status in ("running", "pending"):
+            statuses[name] = "failed"
+        elif name in ("approve", "act", "verify") and status in ("running", "pending"):
+            statuses[name] = "skipped"
+    return _plan(state, **statuses)
+
+
 def _event(what: str, span: str | None = None) -> dict:
     return {"ts": _now(), "what": what, "span_id": span}
 
@@ -459,6 +471,7 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
     def propose(state):
         sess, top = s(state), _target(state)
         flags = sess.tools.observations
+        executable = tuple(a for a, tool in OPS_TOOL.items() if tool in deps.ops.tools())
         action, rationale = None, ""
         if arch == "c0":  # the fixed rule: switch off the flag of the top supported hypothesis
             action = (
@@ -474,12 +487,23 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
                 state.get("runbook", {}),
                 {k: v for k, v in flags.items() if k.startswith("flag.")},
                 state.get("edit_note", ""),
-                tuple(a for a, tool in OPS_TOOL.items() if tool in deps.ops.tools()),
+                executable,
             )
             if proposal is not None:
                 action, rationale = proposal.action.to_action(), proposal.rationale
         if action is None:
             return update(state, _blocked(state, None, ["no_action_proposed"], "No action was proposed."))
+        if action.get("type") not in executable:
+            # Models still suggest restart/scale/rollback; only set_flag is wired in this deploy.
+            return update(
+                state,
+                _blocked(
+                    state,
+                    action,
+                    ["dry_run_missing"],
+                    f"{action.get('type')} is not available in this deployment",
+                ),
+            )
         ok, dry, reason = sess.tools.call("remediation", "ops_dry_run", {"action": action}, cacheable=False)
         dry = dry if ok and isinstance(dry, dict) else {"ok": False, "detail": reason}
         plan_dict = build_plan(
@@ -532,12 +556,15 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
         nxt = (
             "replan" if arch != "c0" and state.get("round", 0) < cfg["budgets"]["max_replans"] else "escalate"
         )
-        return {
+        out = {
             "next": nxt,
             "contradiction": f"Proposal refused ({', '.join(codes)}): {detail}"[:300],
             "proposals": [{"action": action, "blocked": True, "codes": codes}],
             "events": [_event("Proposal refused by the guardrails: " + ", ".join(codes))],
         }
+        if nxt == "escalate":
+            out["plan"] = _close_remediation_plan(state)
+        return out
 
     def approve(state):
         proposal = state["proposal"]
@@ -739,6 +766,7 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
             {
                 "status": "escalated" if outcome == "escalated" else "resolved",
                 "outcome": outcome,
+                "plan": _close_remediation_plan(state),
                 "events": [_event(f"Escalated to the on-call engineer: {reason[:150]}")],
             },
         )
