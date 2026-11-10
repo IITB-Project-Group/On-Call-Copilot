@@ -111,32 +111,13 @@ PAGE = """<!DOCTYPE html>
     #pending { margin: 0.35rem 0 0; font-size: 1.05rem; }
     #live { display: flex; align-items: center; gap: 0.55rem; margin: 0.45rem 0 0; font-size: 1.05rem; }
     #live[hidden] { display: none; }
-    #reason-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      border: 0;
-      background: transparent;
-      padding: 0.1rem 0.2rem;
-      cursor: pointer;
-      color: var(--muted);
-      font: inherit;
-    }
-    #reason-toggle[hidden] { display: none; }
-    #reason-toggle .chevron {
-      width: 0.4rem;
-      height: 0.4rem;
-      border-right: 2px solid currentColor;
-      border-bottom: 2px solid currentColor;
-      transform: rotate(-45deg);
-    }
-    #reason-toggle[aria-expanded="true"] .chevron { transform: rotate(45deg); }
-    #reason-body {
+    #live-activity {
       margin: 0.35rem 0 0 1.5rem;
       max-width: 38rem;
-      color: var(--muted);
+      color: var(--ink);
+      font-size: 1.02rem;
     }
-    #reason-body[hidden] { display: none; }
+    #live-activity[hidden] { display: none; }
     .pulse { display: inline-flex; gap: 0.22rem; align-items: center; height: 1rem; }
     .pulse[hidden], #phase[hidden] { display: none; }
     .pulse i {
@@ -279,12 +260,8 @@ PAGE = """<!DOCTYPE html>
           <div id="live" hidden>
             <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
             <span id="phase">Thinking</span>
-            <button id="reason-toggle" type="button" hidden aria-expanded="false" aria-controls="reason-body">
-              <span class="chevron" aria-hidden="true"></span>
-              Reasoning
-            </button>
           </div>
-          <p id="reason-body" hidden></p>
+          <p id="live-activity" hidden></p>
           <p id="pending"></p>
           <p id="agent-error" hidden></p>
           <p id="plan-focus" class="meta"></p>
@@ -557,31 +534,25 @@ PAGE = """<!DOCTYPE html>
       })));
       const pending = view.pending;
       const phase = phaseOf(view);
-      const reason = (plan.reason || "").trim();
+      const activity = (!pending && view.running) ? plainActivity(view.activity) : "";
       const live = document.querySelector("#live");
-      const toggle = document.querySelector("#reason-toggle");
-      const reasonBody = document.querySelector("#reason-body");
-      live.hidden = !phase && !reason;
+      const liveActivity = document.querySelector("#live-activity");
+      // Phase + tool activity only while the graph is working — not the static plan reason.
+      live.hidden = !phase;
       document.querySelector("#live .pulse").hidden = !phase;
       const phaseNode = document.querySelector("#phase");
       phaseNode.hidden = !phase;
       phaseNode.textContent = phase;
-      toggle.hidden = !reason;
-      reasonBody.textContent = reason;
-      if (!reason) {
-        toggle.setAttribute("aria-expanded", "false");
-        reasonBody.hidden = true;
-      } else {
-        reasonBody.hidden = toggle.getAttribute("aria-expanded") !== "true";
-      }
+      liveActivity.hidden = !activity;
+      liveActivity.textContent = activity;
       const detail = pending
         ? (pending.kind === "action" ? "Waiting for you to approve the command." :
           pending.kind === "comms" ? "Waiting for you to review the status notes. Approve publishes the external note." :
           "Waiting for you to review the proposed lessons.")
-        : plainActivity(view.activity);
+        : "";
       const pendingLine = document.querySelector("#pending");
       pendingLine.textContent = detail;
-      pendingLine.className = phase && detail ? "meta" : "";
+      pendingLine.className = detail ? "meta" : "";
       const error = document.querySelector("#agent-error");
       error.hidden = !view.error;
       error.textContent = view.error ? "Agent error: " + view.error : "";
@@ -915,12 +886,6 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
-    document.querySelector("#reason-toggle").addEventListener("click", () => {
-      const toggle = document.querySelector("#reason-toggle");
-      const open = toggle.getAttribute("aria-expanded") !== "true";
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      document.querySelector("#reason-body").hidden = !open;
-    });
     document.querySelector("#decision-form").addEventListener("submit", (event) => event.preventDefault());
     document.querySelector("#show-open").addEventListener("click", () => setView("open"));
     document.querySelector("#show-closed").addEventListener("click", () => setView("closed"));
