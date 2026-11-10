@@ -13,7 +13,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from prometheus_client import CollectorRegistry
 
 from agents import settings
-from agents.context import AgentContext
+from agents.context import AgentContext, _decision_brief
 from agents.handoffs import ActionSpec, TriageReport
 from agents.llm import ModelFactory, ScriptedChatModel, openrouter_chat, tool_call
 from agents.memory.lessons import LessonStore, lesson_store, open_store, playbook_hash
@@ -221,7 +221,7 @@ def test_rollback_restores_what_was_there_before():
         {"sustain_samples": 3, "window_s": 300},
     )
     assert (
-        plan["expected_effect"]["metric"] == "copilot:service_error_ratio:5m"
+        plan["expected_effect"]["metric"] == "copilot:service_error_ratio:2m"
         and plan["dry_run"]["ok"] is False
     )
     assert ActionSpec(type="scale_service", service="ad", replicas=2).to_action() == {
@@ -491,6 +491,76 @@ def test_context_says_when_memory_is_off():
         "i", None, SimpleNamespace(observations={}), None, settings.Experiment(memory=False), {}, set()
     )
     assert ctx.lesson_text() == "none (memory off)"
+
+
+def test_decision_brief_covers_specialist_roles():
+    assert "plan focus on payment, checkout" in _decision_brief(
+        "commander", {"focus": ["payment", "checkout"]}
+    )
+    assert _decision_brief("replan", {"focus": []}) == "plan focus on no focus"
+    assert _decision_brief("triage", {"suspects": ["payment"]}) == "suspects payment"
+    assert _decision_brief("triage", {}) == "suspects none"
+    assert "top hypothesis payment / error_injection (paymentFailure)" in _decision_brief(
+        "diagnosis",
+        {"hypotheses": [{"service": "payment", "fault_type": "error_injection", "flag": "paymentFailure"}]},
+    )
+    assert _decision_brief("investigator", {"hypotheses": []}) == "top hypothesis ? / ?"
+    assert _decision_brief("runbook", {"recommended_action": {"type": "set_flag"}}) == "recommend set_flag"
+    assert _decision_brief("runbook", {"runbook_ids": ["rb-1", "rb-2"]}) == "runbooks rb-1, rb-2"
+    assert _decision_brief("runbook", {}) == "runbooks no runbook"
+    assert (
+        _decision_brief("remediation", {"action": {"type": "set_flag", "flag": "paymentFailure"}})
+        == "propose set_flag paymentFailure"
+    )
+    assert (
+        _decision_brief("remediation", {"action": {"type": "set_flag", "args": {"flag": "cartFailure"}}})
+        == "propose set_flag cartFailure"
+    )
+    assert _decision_brief(
+        "remediation", {"action": ActionSpec(type="set_flag", flag="paymentFailure", enabled=False)}
+    ).startswith("propose set_flag")
+    assert _decision_brief("remediation", {"action": "raw"}) == "propose an action"
+    assert _decision_brief("comms", {}) == "draft status notes and postmortem"
+    long = _decision_brief("unknown", {"note": "x" * 120})
+    assert long.endswith("…") and len(long) <= 101
+
+
+def test_context_publishes_llm_and_memory_activity(tmp_path):
+    seen: list[str] = []
+    exp = settings.Experiment(memory=True)
+    tools = IncidentTools(executor({"promql_query": lambda query, time=None: {}}), "i")
+    tools.on_activity = seen.append
+    lessons = LessonStore(guardrails=IG)
+    lesson_id = lessons.put(
+        {
+            "service": "payment",
+            "fault_type": "error_injection",
+            "lesson": "turn the flag off",
+            "applies_when": "payment errors",
+            "reviewed_by": "dana",
+            "preconditions": {"flag.paymentFailure": {"op": "eq", "value": True}},
+        }
+    )
+    tools.observations = {"flag.paymentFailure": True}
+    rec = Recorder("i", tmp_path / "t.jsonl", clock=lambda: 1.0)
+    ctx = AgentContext(
+        "i",
+        tools.executor,
+        tools,
+        S.models(exp),
+        exp,
+        settings.load_config(),
+        {"promql_query", "memory_search"},
+        recorder=rec,
+        lessons=lessons,
+    )
+    text = ctx.lesson_text()
+    assert lesson_id in text
+    assert any("Recalling applicable lessons" in row for row in seen)
+    result = ctx.react("triage", "triage", {}, "find suspects", TriageReport)
+    assert result.output is not None
+    assert any(row.startswith("LLM · triage is deciding") for row in seen)
+    assert any(row.startswith("LLM · triage decided:") for row in seen)
 
 
 def test_recorder_writes_jsonl_and_metrics_observe(tmp_path, monkeypatch):

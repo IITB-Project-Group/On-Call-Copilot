@@ -41,6 +41,8 @@ class AgentContext:
         )
         if not (self.experiment.memory and self.lessons is not None):
             toolset.specs = [spec for spec in toolset.specs if spec.name != "memory_search"]
+        if self.tools.on_activity is not None:
+            self.tools.on_activity(f"LLM · {role} is deciding what to do next.")
         result = run_react(
             role=role,
             model=self.models.get(prompt if prompt in ("commander", "replan") else role),
@@ -58,6 +60,8 @@ class AgentContext:
         if self.recorder is not None:
             output = None if result.output is None else result.output.model_dump()
             self.recorder.event("handoff", role=role, reason=result.reason, steps=result.steps, output=output)
+        if result.output is not None and self.tools.on_activity is not None:
+            self.tools.on_activity(f"LLM · {role} decided: {_decision_brief(role, result.output)}")
         return result
 
     def lesson_text(self) -> str:
@@ -67,6 +71,9 @@ class AgentContext:
         applicable = self.lessons.applicable(self.tools.observations)
         if self.recorder is not None:
             self.recorder.event("lessons_recalled", applicable=[lesson["id"] for lesson in applicable])
+        if self.tools.on_activity is not None:
+            ids = ", ".join(lesson["id"] for lesson in applicable[:3]) or "none matched"
+            self.tools.on_activity(f"Memory · Recalling applicable lessons: {ids}.")
         return (
             json.dumps([{k: lesson[k] for k in ("id", "lesson", "applies_when")} for lesson in applicable])
             or "[]"
@@ -84,3 +91,39 @@ def metrics_text() -> str:
 def compact(data: Any, limit: int = 1500) -> str:
     text = json.dumps(data, default=str)
     return text if len(text) <= limit else text[:limit] + "...]"
+
+
+def _decision_brief(role: str, output: Any) -> str:
+    """One short line for the console: what the specialist just submitted."""
+    data = output.model_dump() if hasattr(output, "model_dump") else dict(output or {})
+    if role in ("commander", "replan") or "focus" in data:
+        focus = ", ".join(data.get("focus") or []) or "no focus"
+        return f"plan focus on {focus}"
+    if role == "triage":
+        suspects = ", ".join(data.get("suspects") or []) or "none"
+        return f"suspects {suspects}"
+    if role in ("diagnosis", "investigator"):
+        hyps = data.get("hypotheses") or []
+        top = hyps[0] if hyps else {}
+        label = f"{top.get('service', '?')} / {top.get('fault_type', '?')}"
+        flag = top.get("flag")
+        return f"top hypothesis {label}" + (f" ({flag})" if flag else "")
+    if role == "runbook":
+        action = data.get("recommended_action") or {}
+        if isinstance(action, dict) and action.get("type"):
+            return f"recommend {action.get('type')}"
+        ids = ", ".join((data.get("runbook_ids") or [])[:3]) or "no runbook"
+        return f"runbooks {ids}"
+    if role == "remediation":
+        action = data.get("action") or {}
+        if hasattr(action, "model_dump"):
+            action = action.model_dump()
+        if isinstance(action, dict):
+            kind = action.get("type") or "?"
+            flag = action.get("flag") or (action.get("args") or {}).get("flag")
+            return f"propose {kind}" + (f" {flag}" if flag else "")
+        return "propose an action"
+    if role == "comms":
+        return "draft status notes and postmortem"
+    text = json.dumps(data, default=str)
+    return text if len(text) <= 100 else text[:100] + "…"

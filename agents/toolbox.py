@@ -38,6 +38,10 @@ METRICS: dict[str, tuple[str, str]] = {
         "error_ratio",
         "Max per-operation error ratio by service, 0..1 (the alert's measure).",
     ),
+    "copilot:service_error_ratio:2m": (
+        "error_ratio",
+        "Max per-operation error ratio by service over 2m, 0..1 (faster recovery check).",
+    ),
     "copilot:service_request_rate:2m": ("request_rate", "Calls per second by service."),
     "copilot:service_p95_latency_seconds:2m": ("p95_latency_s", "p95 span latency by service, in seconds."),
     "copilot:container_cpu_ratio": (
@@ -54,6 +58,11 @@ LIVE_PROMQL: dict[str, str] = {
         "max by (service_name) (sum by (service_name, span_name) "
         '(rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m])) / '
         "sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[5m])))"
+    ),
+    "copilot:service_error_ratio:2m": (
+        "max by (service_name) (sum by (service_name, span_name) "
+        '(rate(traces_span_metrics_calls_total{status_code="STATUS_CODE_ERROR"}[2m])) / '
+        "sum by (service_name, span_name) (rate(traces_span_metrics_calls_total[2m])))"
     ),
     "copilot:service_request_rate:2m": "sum by (service_name) (rate(traces_span_metrics_calls_total[2m]))",
     "copilot:service_p95_latency_seconds:2m": (
@@ -695,10 +704,20 @@ class IncidentTools:
     def _activity(self, tool: str, args: dict) -> None:
         if self.on_activity is None:
             return
-        detail = args.get("service") or args.get("query") or args.get("id") or args.get("trace_id") or ""
+        detail = (
+            args.get("service")
+            or args.get("query")
+            or args.get("flag")
+            or args.get("id")
+            or args.get("trace_id")
+            or args.get("runbook_id")
+            or ""
+        )
         detail = " ".join(str(detail).split())[:80]
+        kind = _ACTIVITY_KIND.get(tool, "Tool")
         line = _ACTIVITY.get(tool, tool.replace("_", " "))
-        self.on_activity(f"{line}: {detail}." if detail else f"{line}.")
+        text = f"{kind} · {line}: {detail}." if detail else f"{kind} · {line}."
+        self.on_activity(text)
 
     def _trace(self, role, tool, args, ok, reason, result) -> None:
         if self.recorder is not None:
@@ -708,6 +727,25 @@ class IncidentTools:
                 "tool_call", role=role, tool=tool, args=args, ok=ok, reason=reason, evidence=sorted(ids)[:12]
             )
 
+
+_ACTIVITY_KIND = {
+    "promql_query": "Telemetry",
+    "log_search": "Telemetry",
+    "trace_search": "Telemetry",
+    "trace_get": "Telemetry",
+    "recent_changes": "Telemetry",
+    "service_topology": "Telemetry",
+    "runbook_search": "RAG",
+    "runbook_get": "RAG",
+    "memory_search": "Memory",
+    "memory_write": "Memory",
+    "incident_record_update": "Tickets",
+    "status_draft": "Tickets",
+    "postmortem_draft": "Tickets",
+    "status_publish_external": "Tickets",
+    "ops_dry_run": "Action",
+    "ops_set_flag": "Action",
+}
 
 _ACTIVITY = {
     "promql_query": "Checking metrics",

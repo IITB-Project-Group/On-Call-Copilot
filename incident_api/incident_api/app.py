@@ -245,7 +245,9 @@ def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastA
                 raise HTTPException(
                     status_code=400, detail="Confirmation does not match the exact command shown"
                 )
-        agent.resume(
+        # Wait only until this HITL settles. Joining the full resume thread blocked Approve for
+        # the whole act/verify window and made the button look dead (Reject returned sooner).
+        view = agent.resume_decision(
             incident_id,
             {
                 "decision": body.decision,
@@ -255,10 +257,10 @@ def create_app(db_path: str | None = None, on_approve=None, agent=None) -> FastA
                 "comms_approver": body.approver,
             },
         )
-        updated = current
-        if pending["kind"] == "action" and body.decision in ("approve", "reject"):
-            updated = store.decide(incident_id, body.decision, body.text) or current
-        return {**updated, "agent": agent.view(incident_id)}
+        # Keep the incident open after an action vote. Closing here hid act/verify/comms
+        # while the graph was still running (and broke SEV1's second approver in the UI).
+        refreshed = store.get(incident_id) or current
+        return {**refreshed, "agent": view}
 
     @app.get("/incidents/{incident_id}/stream")
     async def stream(incident_id: str) -> StreamingResponse:

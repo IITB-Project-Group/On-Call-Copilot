@@ -597,7 +597,14 @@ def build_graph(deps: GraphDeps, checkpointer=None, store=None):
         )
         req_id = proposal["request_id"]
         if deps.approvals.get(req_id) is None:  # lost in a restart: propose again
-            return update(state, {"next": "propose", "edit_note": ""})
+            return update(
+                state,
+                {
+                    "next": "propose",
+                    "edit_note": "",
+                    "events": [_event("Approval request missing after restart; proposing again")],
+                },
+            )
         choice, who = decision.get("decision"), decision.get("approver") or "oncall"
         if choice == "approve":
             result = deps.approvals.approve(req_id, who, decision.get("confirmation", ""))

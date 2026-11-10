@@ -34,17 +34,9 @@ PAGE = """<!DOCTYPE html>
       grid-template-columns: 16.5rem minmax(0, 1fr);
       min-height: 100vh;
     }
-    main.has-incident {
-      grid-template-columns: 16.5rem minmax(0, 1fr) minmax(17.5rem, 22rem);
-    }
     aside {
       padding: 1.35rem 1rem 2rem 1.25rem;
       border-right: 1px solid var(--line);
-    }
-    .decision {
-      border-right: 0;
-      border-left: 1px solid var(--line);
-      padding: 1.35rem 1.15rem 2rem;
     }
     #detail { padding: 1.45rem 1.6rem 2.6rem; max-width: 44rem; }
     h1 {
@@ -108,35 +100,85 @@ PAGE = """<!DOCTYPE html>
       line-height: 1.4;
     }
     .kicker { margin: 1.35rem 0 0.4rem; font-weight: 600; }
-    #pending { margin: 0.35rem 0 0; font-size: 1.05rem; }
-    #live { display: flex; align-items: center; gap: 0.55rem; margin: 0.45rem 0 0; font-size: 1.05rem; }
-    #live[hidden] { display: none; }
-    #reason-toggle {
+    .detail-section {
+      margin-top: 1.65rem;
+      padding: 1.05rem 1.15rem 1.2rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      max-width: 42rem;
+    }
+    .detail-section > h2:first-child {
+      margin: 0 0 0.75rem;
+      padding-bottom: 0.55rem;
+      border-bottom: 1px solid var(--line);
+    }
+    #agent[hidden] { display: none; }
+    #checked { margin-top: 1.85rem; }
+    #pending { margin: 0.45rem 0 0; font-size: 1.05rem; }
+    #live-panel { margin: 0.35rem 0 1rem; max-width: 42rem; }
+    #live, #live-activity {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr;
+      gap: 0.55rem 0.75rem;
+      align-items: center;
+      margin: 0.35rem 0 0;
+      font-size: 1.02rem;
+    }
+    #live { grid-template-columns: 4.5rem auto 1fr; }
+    #live[hidden], #live-activity[hidden] { display: none; }
+    .live-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant: all-small-caps;
+      letter-spacing: 0.04em;
+    }
+    #activity-log {
+      list-style: none;
+      margin: 0.65rem 0 0;
+      padding: 0.35rem 0 0;
+      border-top: 1px solid var(--line);
+      max-width: 42rem;
+    }
+    #activity-log[hidden] { display: none; }
+    #activity-log .log-title {
+      margin: 0 0 0.35rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant: all-small-caps;
+      letter-spacing: 0.04em;
+    }
+    #activity-log li {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr;
+      gap: 0.65rem;
+      padding: 0.28rem 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    #activity-log li:last-of-type { color: var(--ink); font-weight: 560; }
+    #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
+    #plan-block { margin-top: 1.1rem; padding-top: 0.85rem; border-top: 1px solid var(--line); }
+    #agent h3, #diagnosis h3, #plan-block h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
+    #plan-block h3, #diagnosis h3:first-of-type { margin-top: 0; }
+    #plan-focus { margin: 0 0 0.45rem; }
+    #diagnosis[hidden] { display: none; }
+    #plan-why summary {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      border: 0;
-      background: transparent;
-      padding: 0.1rem 0.2rem;
+      gap: 0.4rem;
       cursor: pointer;
       color: var(--muted);
-      font: inherit;
+      list-style: none;
     }
-    #reason-toggle[hidden] { display: none; }
-    #reason-toggle .chevron {
+    #plan-why summary::-webkit-details-marker { display: none; }
+    #plan-why .chevron {
       width: 0.4rem;
       height: 0.4rem;
       border-right: 2px solid currentColor;
       border-bottom: 2px solid currentColor;
       transform: rotate(-45deg);
     }
-    #reason-toggle[aria-expanded="true"] .chevron { transform: rotate(45deg); }
-    #reason-body {
-      margin: 0.35rem 0 0 1.5rem;
-      max-width: 38rem;
-      color: var(--muted);
-    }
-    #reason-body[hidden] { display: none; }
+    #plan-why[open] .chevron { transform: rotate(45deg); }
     .pulse { display: inline-flex; gap: 0.22rem; align-items: center; height: 1rem; }
     .pulse[hidden], #phase[hidden] { display: none; }
     .pulse i {
@@ -182,13 +224,93 @@ PAGE = """<!DOCTYPE html>
       font-size: 0.82rem;
       line-height: 1.45;
     }
-    .command {
+    .hitl-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      margin: 1rem 0 0;
+      padding: 0.85rem 1rem;
       background: var(--panel);
       border: 1px solid var(--line);
-      padding: 0.95rem 1rem 1.05rem;
+      max-width: 42rem;
     }
-    .command h2 { margin: 0 0 0.45rem; }
+    .hitl-banner[hidden] { display: none; }
+    .hitl-banner p { margin: 0; flex: 1 1 12rem; }
+    .hitl-banner button {
+      font: inherit;
+      cursor: pointer;
+      background: var(--ink);
+      color: var(--panel);
+      border: 0;
+      padding: 0.42rem 0.85rem;
+    }
+    .title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      max-width: 42rem;
+    }
+    .title-row h1 { margin: 0.2rem 0 0; flex: 1 1 auto; }
+    #close-finished {
+      margin: 0.35rem 0 0;
+      flex: 0 0 auto;
+    }
+    #close-finished[hidden] { display: none; }
+    #close-finished button {
+      font: inherit;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      padding: 0.35rem 0.7rem;
+      white-space: nowrap;
+    }
+    .decision {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 1.25rem;
+      background: rgba(23, 35, 44, 0.28);
+    }
+    .decision[hidden] { display: none; }
+    .command {
+      width: min(28rem, calc(100vw - 2.5rem));
+      max-height: min(92vh, 44rem);
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 1.15rem 1.2rem 1.25rem;
+      box-shadow: 0 18px 48px rgba(23, 35, 44, 0.18);
+    }
+    #hitl-message {
+      margin: 0 0 0.75rem;
+      color: var(--muted);
+    }
+    #hitl-message:empty { display: none; }
+    #hitl-message.error { color: var(--rejected); }
+    .command-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 0 0 0.45rem;
+    }
+    .command h2 { margin: 0; }
     .command p { margin: 0 0 0.75rem; }
+    .modal-close {
+      font: inherit;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 0.2rem 0.55rem;
+      line-height: 1.2;
+    }
     .payload {
       margin: 0 0 0.75rem;
       padding: 0.55rem 0.7rem;
@@ -208,7 +330,7 @@ PAGE = """<!DOCTYPE html>
       font: inherit;
       line-height: 1.4;
     }
-    textarea { min-height: 6.5rem; resize: vertical; }
+    textarea { min-height: 5.5rem; resize: vertical; }
     input { margin-bottom: 0.75rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
     .actions button {
@@ -246,11 +368,11 @@ PAGE = """<!DOCTYPE html>
       background: var(--bg);
       border: 1px solid var(--line);
     }
-    #stream[hidden], #decision[hidden], #payload[hidden], #effect[hidden], #controls[hidden], #decision-form[hidden], #code-fields[hidden], #review-note[hidden], #live[hidden] { display: none; }
+    #stream[hidden], #decision[hidden], #payload[hidden], #effect[hidden], #controls[hidden], #decision-form[hidden], #code-fields[hidden], #review-note[hidden], #live[hidden], #hitl-banner[hidden] { display: none; }
     @media (max-width: 900px) {
-      main, main.has-incident { grid-template-columns: 1fr; }
+      main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
-      .decision { border-left: 0; }
+      .decision { justify-content: center; }
     }
   </style>
 </head>
@@ -267,72 +389,99 @@ PAGE = """<!DOCTYPE html>
     <section id="detail">
       <p id="message" class="hint" aria-live="polite"></p>
       <p id="state" class="meta">Approved and rejected incidents stay on Closed.</p>
-      <h1 id="title">No open incidents</h1>
+      <div class="title-row">
+        <h1 id="title">No open incidents</h1>
+        <p id="close-finished" hidden>
+          <button id="open-close" type="button">Close this incident</button>
+        </p>
+      </div>
       <div id="stream" hidden>
         <p id="now"></p>
         <ol id="stages" aria-label="Where this incident is"></ol>
         <h2>Issue</h2>
         <p id="issue"></p>
         <p id="alert" class="meta"></p>
-        <div id="agent" hidden>
+        <section id="agent" class="detail-section" hidden aria-label="What the agent is doing">
           <h2>What the agent is doing</h2>
-          <div id="live" hidden>
-            <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span id="phase">Thinking</span>
-            <button id="reason-toggle" type="button" hidden aria-expanded="false" aria-controls="reason-body">
-              <span class="chevron" aria-hidden="true"></span>
-              Reasoning
-            </button>
+          <div id="live-panel">
+            <div id="live" hidden>
+              <span class="live-label">Now</span>
+              <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="phase">Investigating</span>
+            </div>
+            <p id="live-activity" hidden>
+              <span class="live-label">Current</span>
+              <span id="live-activity-text"></span>
+            </p>
+            <div id="activity-log" hidden aria-label="Recent agent actions">
+              <p class="log-title">Recent steps</p>
+              <ol id="activity-log-items"></ol>
+            </div>
+            <p id="pending"></p>
+            <p id="agent-error" hidden></p>
           </div>
-          <p id="reason-body" hidden></p>
-          <p id="pending"></p>
-          <p id="agent-error" hidden></p>
+          <div id="plan-block">
+            <h3>Plan progress</h3>
+            <ol id="plan"></ol>
+          </div>
+        </section>
+        <section id="diagnosis" class="detail-section" hidden aria-label="Diagnosis">
+          <h2>Diagnosis</h2>
           <p id="plan-focus" class="meta"></p>
-          <ol id="plan"></ol>
           <details id="plan-why">
-            <summary>Why this plan</summary>
+            <summary><span class="chevron" aria-hidden="true"></span> Why this plan</summary>
             <p id="plan-reason"></p>
           </details>
-          <h2>Likely causes</h2>
+          <h3 id="causes-title">Likely causes</h3>
           <ol id="hypotheses"></ol>
+        </section>
+        <div id="hitl-banner" class="hitl-banner" hidden>
+          <p id="hitl-banner-text">Human approval is needed before the agent continues.</p>
+          <button id="open-hitl" type="button">Review approval</button>
         </div>
-        <p class="kicker">What was checked</p>
-        <ol id="events" class="events"></ol>
-        <details>
-          <summary>Query checked</summary>
-          <pre id="expression"></pre>
-        </details>
+        <section id="checked" class="detail-section" aria-label="What was checked">
+          <h2>What was checked</h2>
+          <ol id="events" class="events"></ol>
+          <details>
+            <summary>Query checked</summary>
+            <pre id="expression"></pre>
+          </details>
+        </section>
       </div>
     </section>
-    <aside id="decision" class="decision" aria-label="Possible solution" hidden>
-      <div class="command">
-        <h2>Your decision</h2>
-        <p id="lead"></p>
-        <p id="shown-code" hidden></p>
-        <div id="review-note" hidden></div>
-        <div id="payload" class="payload" hidden></div>
-        <p id="effect" class="effect" hidden></p>
-        <form id="decision-form">
-          <div id="code-fields">
+  </main>
+  <div id="decision" class="decision" role="dialog" aria-modal="true" aria-labelledby="decision-title" hidden>
+    <div class="command" role="document">
+      <div class="command-head">
+        <h2 id="decision-title">Your decision</h2>
+        <button id="close-hitl" class="modal-close" type="button" aria-label="Close approval dialog">Close</button>
+      </div>
+      <p id="hitl-message" aria-live="polite"></p>
+      <p id="lead"></p>
+      <div id="review-note" hidden></div>
+      <div id="payload" class="payload" hidden></div>
+      <p id="effect" class="effect" hidden></p>
+      <form id="decision-form">
+        <div id="code-fields">
+          <p id="shown-code" hidden></p>
           <label for="confirmation">Confirmation code</label>
           <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
+        </div>
+        <label for="approver">Approver</label>
+        <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
+        <label for="command">Note</label>
+        <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
+        <div id="controls">
+          <div class="actions">
+            <button id="approve" type="button">Approve this command</button>
+            <button id="edit" class="quiet" type="button">Save note</button>
+            <button id="reject" class="quiet" type="button">Reject</button>
           </div>
-          <label for="approver">Approver</label>
-          <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
-          <label for="command">Note</label>
-          <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
-          <div id="controls">
-            <div class="actions">
-              <button id="approve" type="button">Approve this command</button>
-              <button id="edit" class="quiet" type="button">Save note</button>
-              <button id="reject" class="quiet" type="button">Reject</button>
-            </div>
-            <p id="decision-hint" class="hint">Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.</p>
-          </div>
-        </form>
-      </div>
-    </aside>
-  </main>
+          <p id="decision-hint" class="hint">Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.</p>
+        </div>
+      </form>
+    </div>
+  </div>
   <script>
     const list = document.querySelector("#list");
     const title = document.querySelector("#title");
@@ -351,7 +500,13 @@ PAGE = """<!DOCTYPE html>
     const controls = document.querySelector("#controls");
     const events = document.querySelector("#events");
     const approve = document.querySelector("#approve");
-    const shell = document.querySelector("main");
+    const hitlBanner = document.querySelector("#hitl-banner");
+    const hitlBannerText = document.querySelector("#hitl-banner-text");
+    const openHitl = document.querySelector("#open-hitl");
+    const closeFinished = document.querySelector("#close-finished");
+    const openClose = document.querySelector("#open-close");
+    const closeHitl = document.querySelector("#close-hitl");
+    const hitlMessage = document.querySelector("#hitl-message");
     const flagPolicy = "A checkout or payment incident also sets paymentFailure to off.";
     let current = null;
     let source = null;
@@ -359,6 +514,9 @@ PAGE = """<!DOCTYPE html>
     let view = "open";
     let sending = false;
     let listed = "";
+    let hitlDismissed = false;
+    let hitlKey = "";
+    let hitlWasOpen = false;
 
     function payloadOf(incident) {
       try { return JSON.parse(incident.payload); }
@@ -489,40 +647,78 @@ PAGE = """<!DOCTYPE html>
       const named = {
         triage: "Investigating",
         diagnose: "Investigating",
-        runbook: "Reading the runbook",
+        runbook: "Reading runbooks",
         propose: "Planning the command",
-        approve: "Preparing your review",
+        approve: "Waiting for approval",
         act: "Applying the command",
         verify: "Checking recovery",
         communicate: "Writing the note",
         learn: "Reviewing lessons"
       };
-      return named[current] || "Thinking";
+      return named[current] || "Investigating";
     }
 
     function plainActivity(text) {
       if (!text) return "";
       const named = text.match(/service="([^"]+)"/);
-      if (!named) return text;
-      const service = readableName(named[1]);
-      if (text.startsWith("Checking metrics")) return "Checking metrics for " + service + ".";
-      if (text.startsWith("Reading logs")) return "Reading logs for " + service + ".";
-      if (text.startsWith("Looking at traces")) return "Looking at traces for " + service + ".";
+      if (named) {
+        const service = readableName(named[1]);
+        return text
+          .replace(/service="[^"]+"/, service)
+          .replace("Checking metrics:", "Checking metrics for")
+          .replace("Reading logs:", "Reading logs for")
+          .replace("Looking at traces:", "Looking at traces for");
+      }
       return text;
+    }
+
+    function activityKind(text) {
+      const match = String(text || "").match(/^([A-Za-z]+) · /);
+      return match ? match[1] : "Step";
+    }
+
+    function activityBody(text) {
+      return String(text || "").replace(/^[A-Za-z]+ · /, "");
+    }
+
+    function renderActivityLog(view) {
+      const wrap = document.querySelector("#activity-log");
+      const node = document.querySelector("#activity-log-items");
+      // Chronological: oldest → newest. Newest-first made LLM/tool pairs look shuffled.
+      const rows = (view.activity_log || []).slice(-12);
+      wrap.hidden = !rows.length;
+      node.replaceChildren();
+      for (const row of rows) {
+        const item = document.createElement("li");
+        const kind = document.createElement("span");
+        kind.className = "kind";
+        kind.textContent = activityKind(row.text);
+        const body = document.createElement("span");
+        body.textContent = plainActivity(activityBody(row.text));
+        item.append(kind, body);
+        node.appendChild(item);
+      }
     }
 
     function renderAgent(incident) {
       const view = incident.agent;
       const panel = document.querySelector("#agent");
+      const diagnosis = document.querySelector("#diagnosis");
       const now = document.querySelector("#now");
       now.textContent = storyOf(incident);
       now.className = view && view.error ? "error" : "";
       renderStages(incident);
       panel.hidden = !view;
-      if (!view) return;
+      if (!view) {
+        diagnosis.hidden = true;
+        return;
+      }
       const plan = view.plan || {steps: [], focus: []};
       const focus = (plan.focus || []).map(readableName).join(", ");
-      document.querySelector("#plan-focus").textContent = focus ? "Looking at " + focus + "." : "";
+      const hypotheses = view.hypotheses || [];
+      const hasDiagnosis = Boolean(focus || plan.reason || hypotheses.length);
+      diagnosis.hidden = !hasDiagnosis;
+      document.querySelector("#plan-focus").textContent = focus ? "Focus: " + focus : "";
       const why = document.querySelector("#plan-why");
       why.hidden = !plan.reason;
       document.querySelector("#plan-reason").textContent = plan.reason || "";
@@ -532,12 +728,15 @@ PAGE = """<!DOCTYPE html>
       const steps = plan.steps || [];
       let lastRunning = -1;
       steps.forEach((step, index) => { if (step.status === "running") lastRunning = index; });
-      // After escalate, communicate can be done while propose was left "running"; prefer later work.
+      // After escalate, a propose step left "running" should not look active.
+      // While HITL is pending, keep approve/communicate/learn as "now".
       const agentIdle = !view.running && !view.pending;
       fillRows(document.querySelector("#plan"), steps.map((step, index) => {
         let status = step.status === "running" && index < lastRunning ? "done" : step.status;
-        if ((agentIdle || view.pending) && status === "running") {
-          status = step.name === "propose" ? "failed" : "done";
+        if (agentIdle && status === "running") {
+          status = step.name === "propose" ? "failed" : "skipped";
+        } else if (view.pending && status === "running" && step.name === "propose") {
+          status = "failed";
         }
         return {
           name: readableName(step.name),
@@ -546,39 +745,34 @@ PAGE = """<!DOCTYPE html>
         };
       }));
       const causes = document.querySelector("#hypotheses");
-      causes.previousElementSibling.hidden = !(view.hypotheses || []).length;
-      causes.hidden = !(view.hypotheses || []).length;
-      fillRows(causes, (view.hypotheses || []).map((item) => ({
+      const causesTitle = document.querySelector("#causes-title");
+      causesTitle.hidden = !hypotheses.length;
+      causes.hidden = !hypotheses.length;
+      fillRows(causes, hypotheses.map((item) => ({
         name: (item.rank ? item.rank + ". " : "") + readableName(item.service),
         status: String(item.fault_type || "").replaceAll("_", " ") + (item.status ? " · " + item.status : "")
       })));
       const pending = view.pending;
       const phase = phaseOf(view);
-      const reason = (plan.reason || "").trim();
+      const activity = (!pending && view.running) ? plainActivity(view.activity) : "";
       const live = document.querySelector("#live");
-      const toggle = document.querySelector("#reason-toggle");
-      const reasonBody = document.querySelector("#reason-body");
-      live.hidden = !phase && !reason;
+      const liveActivity = document.querySelector("#live-activity");
+      live.hidden = !phase;
       document.querySelector("#live .pulse").hidden = !phase;
       const phaseNode = document.querySelector("#phase");
       phaseNode.hidden = !phase;
       phaseNode.textContent = phase;
-      toggle.hidden = !reason;
-      reasonBody.textContent = reason;
-      if (!reason) {
-        toggle.setAttribute("aria-expanded", "false");
-        reasonBody.hidden = true;
-      } else {
-        reasonBody.hidden = toggle.getAttribute("aria-expanded") !== "true";
-      }
+      liveActivity.hidden = !activity;
+      document.querySelector("#live-activity-text").textContent = activity;
+      renderActivityLog(view);
       const detail = pending
         ? (pending.kind === "action" ? "Waiting for you to approve the command." :
           pending.kind === "comms" ? "Waiting for you to review the status notes. Approve publishes the external note." :
           "Waiting for you to review the proposed lessons.")
-        : plainActivity(view.activity);
+        : "";
       const pendingLine = document.querySelector("#pending");
       pendingLine.textContent = detail;
-      pendingLine.className = phase && detail ? "meta" : "";
+      pendingLine.className = detail ? "meta" : "";
       const error = document.querySelector("#agent-error");
       error.hidden = !view.error;
       error.textContent = view.error ? "Agent error: " + view.error : "";
@@ -616,7 +810,11 @@ PAGE = """<!DOCTYPE html>
       if (!open && incident.decision === "approve") return "Approved. The shop was left unchanged.";
       if (!open) return "Rejected. The shop was left unchanged.";
       if (view && view.pending && view.pending.kind === "action") {
-        return "Type the code shown below, then approve. The command runs only after that.";
+        const needed = Number(view.pending.required_approvals || 1);
+        if (needed > 1) {
+          return "Type the confirmation code below. SEV1 needs two different approvers: approve as oncall, then switch Approver to incident-commander and approve again.";
+        }
+        return "Type the confirmation code below, then approve. The command runs only after that.";
       }
       if (view && view.pending && view.pending.kind === "comms") {
         return view.outcome === "escalated"
@@ -633,16 +831,19 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderPayload(incident) {
-      const flag = writesFlag(incident);
-      payload.hidden = !flag;
-      effect.hidden = !flag;
-      if (!flag) return;
+      // Command + confirmation code belong only to action HITL. Comms/lessons keep the
+      // earlier proposal on the incident row, which used to leak into the note-review modal.
+      const pendingKind = incident.agent && incident.agent.pending && incident.agent.pending.kind;
+      const showCommand = pendingKind === "action" || (!isOpen(incident) && writesFlag(incident) && !pendingKind);
+      payload.hidden = !showCommand;
+      effect.hidden = !showCommand;
+      if (!showCommand) return;
       payload.replaceChildren();
       const proposal = incident.agent && incident.agent.proposal;
       const lines = proposal ? [proposal.command, "rollback: " + proposal.rollback_command, "severity: " + proposal.severity]
         : ["set_flag", "flag: paymentFailure", "value: off"];
       if (incident.proposed_command && !proposal) lines.push(incident.proposed_command);
-      if (incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
+      if (pendingKind === "action" && incident.confirmation_code) lines.push("code: " + incident.confirmation_code);
       for (const line of lines) {
         const row = document.createElement("div");
         row.textContent = line;
@@ -652,10 +853,18 @@ PAGE = """<!DOCTYPE html>
     }
 
     function renderEvents(incident) {
-      const items = [[when(incident.starts_at), "Alert received."]];
+      const items = [];
+      const agentEvents = (incident.agent && incident.agent.events) || [];
+      if (agentEvents.length) {
+        for (const row of agentEvents) {
+          items.push([when(row.ts), row.what || "Update."]);
+        }
+      } else {
+        items.push([when(incident.starts_at), "Alert received."]);
+      }
       if (incident.decision === "edit") {
         items.push([when(incident.updated_at), "Note saved. Earlier approval cleared."]);
-      } else if (incident.decision === "approve") {
+      } else if (incident.decision === "approve" && !(incident.agent && incident.agent.running)) {
         items.push([when(incident.updated_at), "Approved. The note below is what was stored."]);
       } else if (incident.decision === "reject") {
         items.push([when(incident.updated_at), "Rejected. The shop was left unchanged."]);
@@ -672,12 +881,28 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
+    function hitlLabel(pendingKind) {
+      if (pendingKind === "comms") return "A note is ready for your approval.";
+      if (pendingKind === "lessons") return "Lessons are ready for your approval.";
+      if (pendingKind === "action") return "A command is waiting for your approval.";
+      return "Human approval is needed before the agent continues.";
+    }
+
+    function setHitlOpen(openModal) {
+      const opening = openModal && decision.hidden;
+      decision.hidden = !openModal;
+      document.body.style.overflow = openModal ? "hidden" : "";
+      hitlWasOpen = openModal;
+      if (opening) {
+        const focusTarget = !document.querySelector("#code-fields").hidden ? confirmation : approve;
+        if (focusTarget && typeof focusTarget.focus === "function") focusTarget.focus();
+      }
+    }
+
     function show(incident) {
       renderAgent(incident);
       const open = isOpen(incident);
-      shell.classList.add("has-incident");
       stream.hidden = false;
-      decision.hidden = false;
       title.textContent = readableName(incident.service);
       issue.textContent = summaryOf(incident);
       alertName.textContent = readableName(incident.alert_name);
@@ -688,19 +913,32 @@ PAGE = """<!DOCTYPE html>
         firing(incident) ? "firing" : ""
       );
       lead.textContent = leadFor(incident);
+      const decisionTitle = document.querySelector("#decision-title");
+      const titlePending = incident.agent && incident.agent.pending && incident.agent.pending.kind;
+      decisionTitle.textContent = titlePending === "comms" ? "Review status note"
+        : titlePending === "lessons" ? "Review lessons"
+        : titlePending === "action" ? "Approve this command"
+        : "Your decision";
       renderPayload(incident);
       renderReview(incident);
       renderEvents(incident);
       if (document.activeElement !== command) command.value = noteFor(incident);
       expression.textContent = plainText(incident.expression) || "No query was stored with this alert.";
       const shownCode = document.querySelector("#shown-code");
-      const pendingKind = incident.agent && incident.agent.pending && incident.agent.pending.kind;
-      const waitingForCode = open && pendingKind === "action" && incident.confirmation_code;
+      const pending = incident.agent && incident.agent.pending;
+      const pendingKind = pending && pending.kind;
+      const actionCode = String(
+        incident.confirmation_code || (pending && pending.confirmation_code) || ""
+      ).trim();
+      // Always show the code entry for action HITL.
+      const waitingForCode = open && pendingKind === "action";
       document.querySelector("#code-fields").hidden = !waitingForCode;
       shownCode.hidden = !waitingForCode;
-      shownCode.textContent = waitingForCode ? "Code to type: " + incident.confirmation_code : "";
-      if (waitingForCode && document.activeElement !== confirmation) confirmation.value = "";
-      confirmation.placeholder = waitingForCode ? incident.confirmation_code : "Type the code shown with the command";
+      shownCode.textContent = waitingForCode
+        ? (actionCode ? "Code to type: " + actionCode : "Type the confirmation code for this command.")
+        : "";
+      confirmation.placeholder = actionCode || "Type the code shown with the command";
+      confirmation.required = waitingForCode;
       command.readOnly = !open;
       const stillWorking = incident.agent && incident.agent.running && !(incident.agent.pending);
       const waitingOnYou = Boolean(pendingKind);
@@ -708,17 +946,37 @@ PAGE = """<!DOCTYPE html>
         && !incident.agent.running
         && !incident.agent.pending
         && Boolean(incident.agent.outcome);
+      // Popup only for a real HITL wait. Finished/escalated incidents stay quiet unless Review is clicked.
+      const autoHitl = open && waitingOnYou;
+      // Key the wait by command/kind, not confirmation_code — code arriving later must not
+      // clear what the engineer already typed on the previous SSE tick.
+      const nextKey = autoHitl
+        ? [incident.id, pendingKind || "", (pending && pending.command) || "", (pending && pending.kind) || ""].join("|")
+        : "";
+      if (nextKey !== hitlKey) {
+        hitlKey = nextKey;
+        hitlDismissed = false;
+        if (waitingForCode) confirmation.value = "";
+      }
       const form = document.querySelector("#decision-form");
-      form.hidden = open && !waitingForCode && !waitingOnYou;
+      form.hidden = open && !waitingOnYou && !agentFinishedOpen;
       // Show controls for a real HITL wait, or to close a finished escalated/no-action incident.
       controls.hidden = !open || stillWorking || (incident.agent && !waitingOnYou && !agentFinishedOpen);
       approve.textContent = pendingKind === "comms" ? "Approve this note"
         : pendingKind === "lessons" ? "Approve these lessons"
-        : writesFlag(incident) ? "Approve this command"
+        : writesFlag(incident) && waitingOnYou ? "Approve this command"
         : "Approve and close";
+      const needsTwo = pendingKind === "action" && Number((incident.agent.pending || {}).required_approvals || 1) > 1;
       document.querySelector("#decision-hint").textContent = pendingKind === "comms" || pendingKind === "lessons"
         ? "Reject leaves this unpublished and keeps the incident open."
-        : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
+        : needsTwo
+          ? "Use two different Approver ids (oncall, then incident-commander). Approving twice as oncall does nothing."
+          : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
+      // Banner only for real HITL. Finished/escalated gets a quiet Close control, not a review prompt.
+      hitlBannerText.textContent = hitlLabel(pendingKind);
+      hitlBanner.hidden = !(open && waitingOnYou);
+      closeFinished.hidden = !(open && agentFinishedOpen && !waitingOnYou);
+      setHitlOpen(autoHitl && !hitlDismissed);
     }
 
     function renderReview(incident) {
@@ -740,14 +998,17 @@ PAGE = """<!DOCTYPE html>
 
     function showEmpty() {
       const closedView = view === "closed";
-      shell.classList.remove("has-incident");
       title.textContent = closedView ? "No closed incidents" : "No open incidents";
       state.textContent = closedView
         ? "Approved and rejected incidents show up here."
         : "Approved and rejected incidents stay on Closed.";
       state.className = "meta";
       stream.hidden = true;
-      decision.hidden = true;
+      hitlBanner.hidden = true;
+      closeFinished.hidden = true;
+      hitlDismissed = false;
+      hitlKey = "";
+      setHitlOpen(false);
       command.value = "";
       issue.textContent = "";
       alertName.textContent = "";
@@ -844,6 +1105,8 @@ PAGE = """<!DOCTYPE html>
 
     function watch(id) {
       current = id;
+      hitlDismissed = false;
+      hitlKey = "";
       message.textContent = "";
       if (source) source.close();
       source = new EventSource("/incidents/" + id + "/stream");
@@ -851,21 +1114,31 @@ PAGE = """<!DOCTYPE html>
       source.addEventListener("missing", () => {
         current = null;
         source.close();
+        setHitlOpen(false);
+        hitlBanner.hidden = true;
+        closeFinished.hidden = true;
         message.textContent = "That incident is no longer on the server.";
         loadList();
       });
       renderList();
     }
 
+    function setHitlMessage(text, isError) {
+      hitlMessage.textContent = text || "";
+      hitlMessage.className = isError ? "error" : "";
+      message.textContent = text || "";
+      if (isError) message.className = "hint";
+    }
+
     async function send(decisionName) {
       if (!current || sending) return;
       const needsCode = !document.querySelector("#code-fields").hidden;
       if (decisionName === "approve" && needsCode && !confirmation.value.trim()) {
-        message.textContent = "Type the code shown above, then approve.";
+        setHitlMessage("Type the confirmation code above, then approve.", true);
         return;
       }
       sending = true;
-      message.textContent = "";
+      setHitlMessage("Working…");
       try {
         const response = await fetch("/incidents/" + current + "/decision", {
           method: "POST",
@@ -873,8 +1146,8 @@ PAGE = """<!DOCTYPE html>
           body: JSON.stringify({
             decision: decisionName,
             text: command.value,
-            confirmation: confirmation.value,
-            approver: document.querySelector("#approver").value || "oncall"
+            confirmation: confirmation.value.trim(),
+            approver: (document.querySelector("#approver").value || "oncall").trim()
           })
         });
         if (!response.ok) {
@@ -883,11 +1156,13 @@ PAGE = """<!DOCTYPE html>
           if (response.status === 404) {
             current = null;
             if (source) source.close();
+            setHitlOpen(false);
+            setHitlMessage("");
             message.textContent = "That incident is no longer on the server.";
             await loadList();
             return;
           }
-          message.textContent = detail;
+          setHitlMessage(detail, true);
           return;
         }
         const body = await response.json();
@@ -896,34 +1171,76 @@ PAGE = """<!DOCTYPE html>
         if ((decisionName === "approve" || decisionName === "reject") && closed) {
           current = null;
           if (source) source.close();
+          setHitlOpen(false);
           await loadList();
           message.textContent = decisionName === "approve"
             ? (body.flag_result ? service + " closed. " + body.flag_result + "." : service + " closed.")
             : service + " closed. The shop was left unchanged.";
+          hitlMessage.textContent = "";
           return;
         }
         show(body);
-        message.textContent = decisionName === "edit"
-          ? "Saved. The earlier approval was cleared."
-          : "Recorded. This incident stays open for the next step.";
+        const stillAction = body.agent && body.agent.pending && body.agent.pending.kind === "action";
+        const stillPending = body.agent && body.agent.pending;
+        const lastWhat = ((body.agent && body.agent.events) || []).slice(-1)[0];
+        const approvalNote = lastWhat && String(lastWhat.what || "");
+        if (decisionName === "edit") {
+          setHitlMessage("Saved. The earlier approval was cleared.");
+        } else if (stillAction && /duplicate_approver/.test(approvalNote)) {
+          setHitlMessage("Same approver already voted. Switch Approver to incident-commander, then approve again.", true);
+        } else if (stillAction && /awaiting_second_approver|Approval not complete/.test(approvalNote)) {
+          setHitlMessage("First vote recorded. Switch Approver to incident-commander, then approve again.");
+        } else if (stillAction && /proposing again|Proposed:/.test(approvalNote)) {
+          confirmation.value = "";
+          setHitlMessage("A fresh command is ready. Type the new confirmation code, then approve.");
+        } else if (stillAction) {
+          setHitlMessage("Recorded. This command still needs approval before it runs.");
+        } else if (stillPending) {
+          setHitlMessage("Recorded. Next review is ready.");
+        } else if (body.agent && body.agent.running && /Approved by/.test(approvalNote)) {
+          setHitlMessage("Approved. The agent is applying the command and will verify recovery.");
+          setHitlOpen(false);
+        } else if (body.agent && body.agent.running) {
+          setHitlMessage("Recorded. The agent is continuing.");
+        } else {
+          setHitlMessage("Recorded. The agent is continuing.");
+        }
         loadList();
       } finally {
         sending = false;
       }
     }
 
-    document.querySelector("#reason-toggle").addEventListener("click", () => {
-      const toggle = document.querySelector("#reason-toggle");
-      const open = toggle.getAttribute("aria-expanded") !== "true";
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      document.querySelector("#reason-body").hidden = !open;
-    });
     document.querySelector("#decision-form").addEventListener("submit", (event) => event.preventDefault());
     document.querySelector("#show-open").addEventListener("click", () => setView("open"));
     document.querySelector("#show-closed").addEventListener("click", () => setView("closed"));
     approve.addEventListener("click", () => send("approve"));
     document.querySelector("#edit").addEventListener("click", () => send("edit"));
     document.querySelector("#reject").addEventListener("click", () => send("reject"));
+    openHitl.addEventListener("click", () => {
+      hitlDismissed = false;
+      setHitlOpen(true);
+    });
+    openClose.addEventListener("click", () => {
+      hitlDismissed = false;
+      setHitlOpen(true);
+    });
+    closeHitl.addEventListener("click", () => {
+      hitlDismissed = true;
+      setHitlOpen(false);
+    });
+    decision.addEventListener("click", (event) => {
+      if (event.target === decision) {
+        hitlDismissed = true;
+        setHitlOpen(false);
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !decision.hidden) {
+        hitlDismissed = true;
+        setHitlOpen(false);
+      }
+    });
     loadList();
     setInterval(loadList, 5000);
   </script>
