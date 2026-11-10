@@ -291,6 +291,7 @@ def test_resume_decision_returns_before_verification_finishes():
     service.wait(timeout=15)
     pending = service.pending(iid)
     assert pending and pending["kind"] == "action"
+    before_events = len((service.view(iid).get("events") or []))
     started = time.time()
     view = service.resume_decision(
         iid,
@@ -304,10 +305,178 @@ def test_resume_decision_returns_before_verification_finishes():
         timeout=15,
     )
     assert time.time() - started < 12
-    # Either the action interrupt cleared, or a dual-control vote was recorded quickly.
-    cur = service.pending(iid)
-    assert cur is None or cur.get("kind") != "action" or len(view.get("events") or []) > 0
+    # Must not return the pre-vote snapshot (that made Approve look like a no-op in the console).
+    events = [e.get("what", "") for e in (view.get("events") or [])]
+    progressed = len(events) > before_events or any(
+        s in (events[-1] if events else "") for s in ("Approved by", "Approval not complete", "Rejected by")
+    )
+    pending_after = view.get("pending")
+    assert progressed or pending_after is None or (pending_after or {}).get("kind") != "action"
+    what = " ".join(events)
+    assert "Approved by" in what or "Approval not complete" in what or view.get("running")
     service.wait(timeout=30)
+
+
+def test_resume_wait_joins_the_worker_thread():
+    service, twin, iid = service_for()
+    service.run_async = True
+    service.start(iid, twin.alert())
+    service.wait(timeout=15)
+    pending = service.pending(iid)
+    assert pending and pending["kind"] == "action"
+    service.resume(
+        iid,
+        {
+            "decision": "reject",
+            "approver": "oncall",
+            "confirmation": pending["confirmation_code"],
+            "text": "no",
+        },
+        wait=True,
+        timeout=15,
+    )
+    assert (
+        service.pending(iid) is None
+        or service.pending(iid).get("kind") != "action"
+        or service.view(iid).get("events")
+    )
+
+
+def test_resume_decision_covers_rearm_timeout_and_kind_change(monkeypatch):
+    """Drive every wait branch without running the full verify window."""
+    service, twin, iid = service_for()
+    service.run_async = False
+    calls = {"n": 0}
+    monkeypatch.setattr(service, "_run", lambda incident_id, value: None)
+    monkeypatch.setattr(service, "pending", lambda iid: {"kind": "action"})
+
+    def play(snapshots, timeout=2):
+        calls["n"] = 0
+
+        def fake_view(incident_id):
+            i = min(calls["n"], len(snapshots) - 1)
+            calls["n"] += 1
+            return dict(snapshots[i])
+
+        monkeypatch.setattr(service, "view", fake_view)
+        return service.resume_decision(iid, {"decision": "approve"}, timeout=timeout)
+
+    view = play(
+        [
+            {
+                "pending": {"kind": "action"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            },
+            {
+                "pending": None,
+                "events": [
+                    {"what": "Proposed: x"},
+                    {"what": "Approval not complete: awaiting_second_approver"},
+                ],
+                "running": True,
+                "outcome": None,
+            },
+            {
+                "pending": {"kind": "action"},
+                "events": [
+                    {"what": "Proposed: x"},
+                    {"what": "Approval not complete: awaiting_second_approver"},
+                ],
+                "running": False,
+                "outcome": None,
+            },
+        ]
+    )
+    assert view["pending"]["kind"] == "action"
+    assert any("Approval not complete" in e["what"] for e in view["events"])
+
+    timed = play(
+        [
+            {
+                "pending": {"kind": "action"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            }
+        ],
+        timeout=0.25,
+    )
+    assert timed["pending"]["kind"] == "action"
+
+    moved = play(
+        [
+            {
+                "pending": {"kind": "action"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            },
+            {
+                "pending": {"kind": "comms"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            },
+        ]
+    )
+    assert moved["pending"]["kind"] == "comms"
+
+    finished = play(
+        [
+            {
+                "pending": {"kind": "action"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            },
+            {"pending": None, "events": [{"what": "Proposed: x"}], "running": False, "outcome": "resolved"},
+        ]
+    )
+    assert finished["outcome"] == "resolved" and finished["pending"] is None
+
+    again = play(
+        [
+            {
+                "pending": {"kind": "action"},
+                "events": [{"what": "Proposed: x"}],
+                "running": False,
+                "outcome": None,
+            },
+            {
+                "pending": None,
+                "events": [
+                    {"what": "Proposed: x"},
+                    {"what": "Approval request missing after restart; proposing again"},
+                ],
+                "running": True,
+                "outcome": None,
+            },
+            {
+                "pending": None,
+                "events": [
+                    {"what": "Proposed: x"},
+                    {"what": "Approval request missing after restart; proposing again"},
+                    {"what": "Proposed: ops-actions set_flag --enabled false --flag paymentFailure"},
+                ],
+                "running": True,
+                "outcome": None,
+            },
+            {
+                "pending": {"kind": "action", "confirmation_code": "AABBCCDD"},
+                "events": [
+                    {"what": "Proposed: x"},
+                    {"what": "Approval request missing after restart; proposing again"},
+                    {"what": "Proposed: ops-actions set_flag --enabled false --flag paymentFailure"},
+                ],
+                "running": False,
+                "outcome": None,
+            },
+        ]
+    )
+    assert again["pending"]["kind"] == "action"
+    assert any("proposing again" in e["what"] for e in again["events"])
 
 
 def test_service_runs_to_each_decision_and_publishes_a_view():

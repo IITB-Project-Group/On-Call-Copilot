@@ -221,7 +221,7 @@ def test_rollback_restores_what_was_there_before():
         {"sustain_samples": 3, "window_s": 300},
     )
     assert (
-        plan["expected_effect"]["metric"] == "copilot:service_error_ratio:5m"
+        plan["expected_effect"]["metric"] == "copilot:service_error_ratio:2m"
         and plan["dry_run"]["ok"] is False
     )
     assert ActionSpec(type="scale_service", service="ad", replicas=2).to_action() == {
@@ -502,22 +502,20 @@ def test_decision_brief_covers_specialist_roles():
     assert _decision_brief("triage", {}) == "suspects none"
     assert "top hypothesis payment / error_injection (paymentFailure)" in _decision_brief(
         "diagnosis",
-        {
-            "hypotheses": [
-                {"service": "payment", "fault_type": "error_injection", "flag": "paymentFailure"}
-            ]
-        },
+        {"hypotheses": [{"service": "payment", "fault_type": "error_injection", "flag": "paymentFailure"}]},
     )
     assert _decision_brief("investigator", {"hypotheses": []}) == "top hypothesis ? / ?"
     assert _decision_brief("runbook", {"recommended_action": {"type": "set_flag"}}) == "recommend set_flag"
     assert _decision_brief("runbook", {"runbook_ids": ["rb-1", "rb-2"]}) == "runbooks rb-1, rb-2"
     assert _decision_brief("runbook", {}) == "runbooks no runbook"
-    assert _decision_brief(
-        "remediation", {"action": {"type": "set_flag", "flag": "paymentFailure"}}
-    ) == "propose set_flag paymentFailure"
-    assert _decision_brief(
-        "remediation", {"action": {"type": "set_flag", "args": {"flag": "cartFailure"}}}
-    ) == "propose set_flag cartFailure"
+    assert (
+        _decision_brief("remediation", {"action": {"type": "set_flag", "flag": "paymentFailure"}})
+        == "propose set_flag paymentFailure"
+    )
+    assert (
+        _decision_brief("remediation", {"action": {"type": "set_flag", "args": {"flag": "cartFailure"}}})
+        == "propose set_flag cartFailure"
+    )
     assert _decision_brief(
         "remediation", {"action": ActionSpec(type="set_flag", flag="paymentFailure", enabled=False)}
     ).startswith("propose set_flag")

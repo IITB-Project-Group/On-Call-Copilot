@@ -46,12 +46,14 @@ verification:
   sustain_samples: 3
   # Expected effect per fault type. Metric names are the copilot:* recording rules in agents/toolbox.py.
   effects:
-    error_injection: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
-    dependency_unreachable: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
-    bad_deploy: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
-    crash: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
-    hang: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
-    config_error: {metric: "copilot:service_error_ratio:5m", comparator: "<", threshold: 0.05}
+    # 2m window so local demo recovery is visible inside the 5-minute verify loop;
+    # a 5m rate stays hot long after paymentFailure is flipped off.
+    error_injection: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
+    dependency_unreachable: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
+    bad_deploy: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
+    crash: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
+    hang: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
+    config_error: {metric: "copilot:service_error_ratio:2m", comparator: "<", threshold: 0.05}
     latency: {metric: "copilot:service_p95_latency_seconds:2m", comparator: "<", threshold: 1.0}
     resource_exhaustion: {metric: "copilot:service_p95_latency_seconds:2m", comparator: "<", threshold: 1.0}
     memory_leak: {metric: "copilot:memory_growth_ratio:5m", comparator: "<", threshold: 0.05}

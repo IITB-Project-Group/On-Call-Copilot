@@ -1190,13 +1190,18 @@ PAGE = """<!DOCTYPE html>
           setHitlMessage("Same approver already voted. Switch Approver to incident-commander, then approve again.", true);
         } else if (stillAction && /awaiting_second_approver|Approval not complete/.test(approvalNote)) {
           setHitlMessage("First vote recorded. Switch Approver to incident-commander, then approve again.");
+        } else if (stillAction && /proposing again|Proposed:/.test(approvalNote)) {
+          confirmation.value = "";
+          setHitlMessage("A fresh command is ready. Type the new confirmation code, then approve.");
         } else if (stillAction) {
           setHitlMessage("Recorded. This command still needs approval before it runs.");
         } else if (stillPending) {
           setHitlMessage("Recorded. Next review is ready.");
-        } else if (body.agent && body.agent.running) {
+        } else if (body.agent && body.agent.running && /Approved by/.test(approvalNote)) {
           setHitlMessage("Approved. The agent is applying the command and will verify recovery.");
           setHitlOpen(false);
+        } else if (body.agent && body.agent.running) {
+          setHitlMessage("Recorded. The agent is continuing.");
         } else {
           setHitlMessage("Recorded. The agent is continuing.");
         }

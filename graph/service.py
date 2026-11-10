@@ -63,34 +63,48 @@ class AgentService:
 
         Approve used to ``join`` the whole resume thread, so the console sat on Working… for the
         full verification window (~45s+) and looked broken. Reject felt fine because it returns sooner.
+
+        Never treat a briefly cleared interrupt as done: during Command(resume) the interrupt
+        drops before ``Approved by`` / ``Approval not complete`` is checkpointed, and a separate
+        pending() read can disagree with view(). Wait for a new timeline event (or a real move to
+        another HITL kind / terminal outcome) from one consistent snapshot.
         """
         before = self.pending(incident_id)
         before_kind = None if before is None else before.get("kind")
         before_events = len((self.view(incident_id).get("events") or []))
-        needed = int((before or {}).get("required_approvals") or 1)
         self._run(incident_id, Command(resume=decision))
         deadline = time.time() + timeout
         view = self.view(incident_id)
         while time.time() < deadline:
             view = self.view(incident_id)
-            current = self.pending(incident_id)
-            current_kind = None if current is None else current.get("kind")
+            pending = view.get("pending")
+            current_kind = None if pending is None else pending.get("kind")
             events = view.get("events") or []
-            # Fully approved action → interrupt cleared; act/verify continue in the background.
-            if before_kind == "action" and current_kind != "action":
+            if len(events) > before_events:
+                new_whats = [str((e or {}).get("what") or "") for e in events[before_events:]]
+                blob = " ".join(new_whats)
+                # Action HITL can emit an event before the next interrupt is armed
+                # (SEV1 first vote, or re-propose after a lost approval request). Wait for
+                # that re-arm so the console does not flash “Approved” and hide the code.
+                if before_kind == "action" and current_kind != "action":
+                    waiting_rearm = (
+                        "Approval not complete" in blob
+                        or "proposing again" in blob
+                        or "missing after restart" in blob
+                        or (
+                            "Proposed:" in blob
+                            and "Approved by" not in blob
+                            and "Proposal refused" not in blob
+                            and "Rejected by" not in blob
+                        )
+                    )
+                    if waiting_rearm:
+                        time.sleep(0.1)
+                        continue
                 return view
-            # SEV1 first vote (or duplicate) leaves action pending but appends an approval event.
-            if (
-                before_kind == "action"
-                and current_kind == "action"
-                and needed > 1
-                and len(events) > before_events
-            ):
+            if current_kind is not None and current_kind != before_kind:
                 return view
-            # Reject / edit / comms / lessons moved to a different wait or finished.
-            if current_kind != before_kind:
-                return view
-            if not view.get("running") and current is None and view.get("outcome"):
+            if not view.get("running") and pending is None and view.get("outcome"):
                 return view
             time.sleep(0.1)
         return view
