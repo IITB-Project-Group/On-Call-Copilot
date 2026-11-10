@@ -58,7 +58,7 @@ def test_experiments_validate_and_split_the_same_budget(tmp_path):
     with pytest.raises(ValueError):
         settings.Experiment(budget=0)
     exp = settings.Experiment(models={"specialist": "x/y"})
-    assert exp.model_id("specialist") == "x/y" and exp.model_id("commander") == "openai/gpt-4.1"
+    assert exp.model_id("specialist") == "x/y" and exp.model_id("commander") == "openai/gpt-6-luna"
     assert exp.with_budget(20).name.endswith("-b20")
     for total in (5, 10, 20):
         assert sum(settings.role_budgets(settings.Experiment(budget=total)).values()) == total
@@ -84,8 +84,8 @@ def test_model_factory_builds_one_model_per_slot():
     built = []
     factory = ModelFactory(settings.Experiment(), builder=lambda mid, slot, cfg: built.append(mid) or mid)
     assert factory.get("triage") == factory.get("diagnosis") == "openai/gpt-4.1-mini"
-    assert factory.get("replan") == "openai/gpt-4.1"
-    assert built == ["openai/gpt-4.1-mini", "openai/gpt-4.1"]
+    assert factory.get("replan") == "openai/gpt-6-luna"
+    assert built == ["openai/gpt-4.1-mini", "openai/gpt-6-luna"]
 
 
 # ---------------------------------------------------------------- ReAct

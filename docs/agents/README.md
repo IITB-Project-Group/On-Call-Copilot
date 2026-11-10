@@ -71,7 +71,7 @@ specialist (ReAct) ──> RoleToolset ──> GuardedExecutor.call_tool ──>
 
 | Layer | What we use | Where |
 | --- | --- | --- |
-| Models | OpenRouter: `openai/gpt-4.1` for the commander, `openai/gpt-4.1-mini` for the specialists, a judge from a different family | `agents/config/agents.yaml`, `agents/llm.py` |
+| Models | OpenRouter: `openai/gpt-6-luna` for the commander, `openai/gpt-4.1-mini` for the specialists, a judge from a different family | `agents/config/agents.yaml`, `agents/llm.py` |
 | Orchestration | LangGraph `StateGraph`, typed state, conditional edges, `Send` fan-out, SQLite checkpointer, `interrupt()` / `Command(resume=...)` | `graph/incident_graph.py`, `graph/service.py` |
 | Long-term memory | LangGraph store (`InMemoryStore`, or `SqliteStore` live) with precondition-checked lessons | `agents/memory/lessons.py` |
 | Tools | FastMCP servers loaded with langchain-mcp-adapters (`McpFetch`; descriptions pinned to the repo), or the in-process client | `agents/toolbox.py` |
