@@ -150,7 +150,18 @@ fi
 echo "Building the incident API image."
 docker build --load -f "${ROOT}/incident_api/Dockerfile" -t "${IMAGE_NAME}" "${ROOT}"
 kind load docker-image "${IMAGE_NAME}" --name "${CLUSTER_NAME}"
+# The key stays in the openrouter secret. The deployment reads it and starts without it.
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  echo "Storing OPENROUTER_API_KEY in secret openrouter."
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" create secret generic openrouter \
+    --from-literal=api-key="${OPENROUTER_API_KEY}" \
+    --dry-run=client -o yaml |
+    kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" apply -f -
+fi
 kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/incident-api.yaml"
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout restart deployment/incident-api
+fi
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s
 
 # OpenSearch maps attributes.http as text after the first string value, then
@@ -260,9 +271,6 @@ live_env=(
   "JAEGER_URL=http://frontend-proxy:8080"
   "JAEGER_BASE_PATH=/jaeger/ui"
 )
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-  live_env+=("OPENROUTER_API_KEY=${OPENROUTER_API_KEY}")
-fi
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" set env deploy/incident-api "${live_env[@]}"
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s
 for service in opensearch flagd; do
@@ -453,7 +461,7 @@ echo "  Telemetry MCP     http://127.0.0.1:${TELEMETRY_MCP_PORT}/mcp"
 echo "  Runbooks MCP      http://127.0.0.1:${RUNBOOKS_MCP_PORT}/mcp"
 echo
 echo "A service whose error rate stays above 5% over 5 minutes opens an incident. paymentFailure and aiRunawayAgent are two ways to cause that."
-echo "The incident API runs the agent graph (COPILOT_AGENT=${COPILOT_AGENT:-c2}; without OPENROUTER_API_KEY it uses the fixed workflow)."
+echo "The incident API runs the agent graph (COPILOT_AGENT=${COPILOT_AGENT:-c2}; without secret openrouter it uses the fixed workflow)."
 echo "The copilot MCP servers read Prometheus, Jaeger, OpenSearch, and flagd on these localhost ports."
 echo
 echo "Pods:"

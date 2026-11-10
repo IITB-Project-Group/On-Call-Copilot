@@ -209,8 +209,8 @@ python -m graph.cli decide --workdir demo --decision approve --approver eval-onc
 
 # Live, inside the cluster (after ./up.sh)
 # deploy/incident-api.yaml sets COPILOT_AGENT=c2 and in-cluster Prometheus/Jaeger/OpenSearch.
-# Without OPENROUTER_API_KEY the API falls back to c0 (fixed workflow, no model).
-# Optional: export OPENROUTER_API_KEY before ./up.sh to keep c2.
+# Without the openrouter secret the API falls back to c0 (fixed workflow, no model).
+# Optional: export OPENROUTER_API_KEY before ./up.sh. The script stores it in secret openrouter.
 # Local process instead of the pod:
 COPILOT_AGENT=c2 OPENROUTER_API_KEY=... uvicorn incident_api.app:app   # COPILOT_MCP_URL=http://127.0.0.1:8012/mcp to read via MCP
 

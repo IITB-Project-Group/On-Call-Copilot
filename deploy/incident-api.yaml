@@ -41,7 +41,13 @@ spec:
               value: http://frontend-proxy:8080
             - name: JAEGER_BASE_PATH
               value: /jaeger/ui
-            # c2 falls back to the fixed workflow when OPENROUTER_API_KEY is unset.
+            # c2 falls back to the fixed workflow when this secret is absent.
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openrouter
+                  key: api-key
+                  optional: true
             - name: COPILOT_AGENT
               value: c2
           readinessProbe:
