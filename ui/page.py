@@ -847,17 +847,18 @@ PAGE = """<!DOCTYPE html>
       if (document.activeElement !== command) command.value = noteFor(incident);
       expression.textContent = plainText(incident.expression) || "No query was stored with this alert.";
       const shownCode = document.querySelector("#shown-code");
-      const pendingKind = incident.agent && incident.agent.pending && incident.agent.pending.kind;
-      const actionCode = String(incident.confirmation_code || "").trim();
-      // Always show the code entry for action HITL. Do not gate on confirmation_code being
-      // present yet — a brief publish race used to hide the whole field.
+      const pending = incident.agent && incident.agent.pending;
+      const pendingKind = pending && pending.kind;
+      const actionCode = String(
+        incident.confirmation_code || (pending && pending.confirmation_code) || ""
+      ).trim();
+      // Always show the code entry for action HITL.
       const waitingForCode = open && pendingKind === "action";
       document.querySelector("#code-fields").hidden = !waitingForCode;
       shownCode.hidden = !waitingForCode;
       shownCode.textContent = waitingForCode
         ? (actionCode ? "Code to type: " + actionCode : "Type the confirmation code for this command.")
         : "";
-      if (waitingForCode && document.activeElement !== confirmation) confirmation.value = "";
       confirmation.placeholder = actionCode || "Type the code shown with the command";
       confirmation.required = waitingForCode;
       command.readOnly = !open;
@@ -869,12 +870,15 @@ PAGE = """<!DOCTYPE html>
         && Boolean(incident.agent.outcome);
       // Popup only for a real HITL wait. Finished/escalated incidents stay quiet unless Review is clicked.
       const autoHitl = open && waitingOnYou;
+      // Key the wait by command/kind, not confirmation_code — code arriving later must not
+      // clear what the engineer already typed on the previous SSE tick.
       const nextKey = autoHitl
-        ? [incident.id, pendingKind || "", incident.confirmation_code || "", (incident.agent.pending || {}).command || ""].join("|")
+        ? [incident.id, pendingKind || "", (pending && pending.command) || "", (pending && pending.kind) || ""].join("|")
         : "";
       if (nextKey !== hitlKey) {
         hitlKey = nextKey;
         hitlDismissed = false;
+        if (waitingForCode) confirmation.value = "";
       }
       const form = document.querySelector("#decision-form");
       form.hidden = open && !waitingOnYou && !agentFinishedOpen;

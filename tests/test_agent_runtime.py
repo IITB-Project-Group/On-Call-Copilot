@@ -397,6 +397,7 @@ def test_api_runs_the_agent_and_resumes_on_decisions(tmp_path, monkeypatch):
     iid = created["id"]
     incident = api.get(f"/incidents/{iid}").json()
     assert incident["agent"]["pending"]["kind"] == "action" and incident["confirmation_code"]
+    assert incident["agent"]["pending"].get("confirmation_code") == incident["confirmation_code"]
     code = incident["confirmation_code"]
     assert (
         api.post(

@@ -157,7 +157,9 @@ class AgentService:
                 **{
                     k: v
                     for k, v in pending.items()
-                    if k in ("command", "external", "lessons", "required_approvals")
+                    # confirmation_code travels with the pending action so the console never
+                    # waits on a separate store write before showing the code field.
+                    if k in ("command", "external", "lessons", "required_approvals", "confirmation_code")
                 },
             },
             "events": (state.get("events") or [])[-15:],

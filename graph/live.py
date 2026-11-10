@@ -126,17 +126,17 @@ def build_live_agent(
     saver = SqliteSaver(sqlite3.connect(str(base.with_name("checkpoints.sqlite3")), check_same_thread=False))
 
     def publish(incident_id: str, view: dict) -> None:
-        # Store the confirmation code before the agent view, so the console modal never
-        # opens an action approval without a code field to type.
+        # Write proposal + agent view together so the stream never sees pending action
+        # without confirmation_code (or the reverse).
         pending = service.pending(incident_id)
+        proposal = None
         if pending and pending.get("kind") == "action":
-            store.set_proposal(
-                incident_id,
-                request_id=pending["request_id"],
-                code=pending["confirmation_code"],
-                command=pending["command"],
-            )
-        store.set_agent(incident_id, view)
+            proposal = {
+                "request_id": pending["request_id"],
+                "code": pending["confirmation_code"],
+                "command": pending["command"],
+            }
+        store.set_agent(incident_id, view, proposal=proposal)
         # Close only when the graph is done and recovery was verified. Action approve must
         # not close early — act, verify, and later HITL still need an open incident.
         current = store.get(incident_id)

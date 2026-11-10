@@ -172,9 +172,25 @@ class IncidentStore:
                 return None
         return self.get(incident_id)
 
-    def set_agent(self, incident_id: str, view: dict) -> None:
-        """Store what the agent graph shows for this incident: plan, hypotheses, pending decision."""
+    def set_agent(self, incident_id: str, view: dict, *, proposal: dict | None = None) -> None:
+        """Store the agent view, optionally with the action proposal, in one write."""
         with self._lock, self._connect() as connection:
+            if proposal is not None:
+                connection.execute(
+                    """
+                    UPDATE incidents
+                    SET approval_request_id = ?, confirmation_code = ?, proposed_command = ?, agent_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        proposal["request_id"],
+                        proposal["code"],
+                        proposal["command"],
+                        json.dumps(view, default=str),
+                        incident_id,
+                    ),
+                )
+                return
             connection.execute(
                 "UPDATE incidents SET agent_json = ? WHERE id = ?",
                 (json.dumps(view, default=str), incident_id),
