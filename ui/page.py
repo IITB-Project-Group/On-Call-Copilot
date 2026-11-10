@@ -34,17 +34,9 @@ PAGE = """<!DOCTYPE html>
       grid-template-columns: 16.5rem minmax(0, 1fr);
       min-height: 100vh;
     }
-    main.has-incident {
-      grid-template-columns: 16.5rem minmax(0, 1fr) minmax(17.5rem, 22rem);
-    }
     aside {
       padding: 1.35rem 1rem 2rem 1.25rem;
       border-right: 1px solid var(--line);
-    }
-    .decision {
-      border-right: 0;
-      border-left: 1px solid var(--line);
-      padding: 1.35rem 1.15rem 2rem;
     }
     #detail { padding: 1.45rem 1.6rem 2.6rem; max-width: 44rem; }
     h1 {
@@ -216,13 +208,63 @@ PAGE = """<!DOCTYPE html>
       font-size: 0.82rem;
       line-height: 1.45;
     }
-    .command {
+    .hitl-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      margin: 1rem 0 0;
+      padding: 0.85rem 1rem;
       background: var(--panel);
       border: 1px solid var(--line);
-      padding: 0.95rem 1rem 1.05rem;
     }
-    .command h2 { margin: 0 0 0.45rem; }
+    .hitl-banner[hidden] { display: none; }
+    .hitl-banner p { margin: 0; flex: 1 1 12rem; }
+    .hitl-banner button {
+      font: inherit;
+      cursor: pointer;
+      background: var(--ink);
+      color: var(--panel);
+      border: 0;
+      padding: 0.42rem 0.85rem;
+    }
+    .decision {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      background: rgba(23, 35, 44, 0.42);
+    }
+    .decision[hidden] { display: none; }
+    .command {
+      width: min(32rem, 100%);
+      max-height: min(92vh, 44rem);
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 1.15rem 1.2rem 1.25rem;
+      box-shadow: 0 18px 48px rgba(23, 35, 44, 0.18);
+    }
+    .command-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 0 0 0.45rem;
+    }
+    .command h2 { margin: 0; }
     .command p { margin: 0 0 0.75rem; }
+    .modal-close {
+      font: inherit;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 0.2rem 0.55rem;
+      line-height: 1.2;
+    }
     .payload {
       margin: 0 0 0.75rem;
       padding: 0.55rem 0.7rem;
@@ -242,7 +284,7 @@ PAGE = """<!DOCTYPE html>
       font: inherit;
       line-height: 1.4;
     }
-    textarea { min-height: 6.5rem; resize: vertical; }
+    textarea { min-height: 5.5rem; resize: vertical; }
     input { margin-bottom: 0.75rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
     .actions button {
@@ -280,11 +322,10 @@ PAGE = """<!DOCTYPE html>
       background: var(--bg);
       border: 1px solid var(--line);
     }
-    #stream[hidden], #decision[hidden], #payload[hidden], #effect[hidden], #controls[hidden], #decision-form[hidden], #code-fields[hidden], #review-note[hidden], #live[hidden] { display: none; }
+    #stream[hidden], #decision[hidden], #payload[hidden], #effect[hidden], #controls[hidden], #decision-form[hidden], #code-fields[hidden], #review-note[hidden], #live[hidden], #hitl-banner[hidden] { display: none; }
     @media (max-width: 900px) {
-      main, main.has-incident { grid-template-columns: 1fr; }
+      main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
-      .decision { border-left: 0; }
     }
   </style>
 </head>
@@ -339,6 +380,10 @@ PAGE = """<!DOCTYPE html>
           <h2>Likely causes</h2>
           <ol id="hypotheses"></ol>
         </div>
+        <div id="hitl-banner" class="hitl-banner" hidden>
+          <p id="hitl-banner-text">Human approval is needed before the agent continues.</p>
+          <button id="open-hitl" type="button">Review approval</button>
+        </div>
         <p class="kicker">What was checked</p>
         <ol id="events" class="events"></ol>
         <details>
@@ -347,35 +392,38 @@ PAGE = """<!DOCTYPE html>
         </details>
       </div>
     </section>
-    <aside id="decision" class="decision" aria-label="Possible solution" hidden>
-      <div class="command">
-        <h2>Your decision</h2>
-        <p id="lead"></p>
-        <p id="shown-code" hidden></p>
-        <div id="review-note" hidden></div>
-        <div id="payload" class="payload" hidden></div>
-        <p id="effect" class="effect" hidden></p>
-        <form id="decision-form">
-          <div id="code-fields">
-          <label for="confirmation">Confirmation code</label>
-          <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
-          </div>
-          <label for="approver">Approver</label>
-          <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
-          <label for="command">Note</label>
-          <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
-          <div id="controls">
-            <div class="actions">
-              <button id="approve" type="button">Approve this command</button>
-              <button id="edit" class="quiet" type="button">Save note</button>
-              <button id="reject" class="quiet" type="button">Reject</button>
-            </div>
-            <p id="decision-hint" class="hint">Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.</p>
-          </div>
-        </form>
-      </div>
-    </aside>
   </main>
+  <div id="decision" class="decision" role="dialog" aria-modal="true" aria-labelledby="decision-title" hidden>
+    <div class="command" role="document">
+      <div class="command-head">
+        <h2 id="decision-title">Your decision</h2>
+        <button id="close-hitl" class="modal-close" type="button" aria-label="Close approval dialog">Close</button>
+      </div>
+      <p id="lead"></p>
+      <p id="shown-code" hidden></p>
+      <div id="review-note" hidden></div>
+      <div id="payload" class="payload" hidden></div>
+      <p id="effect" class="effect" hidden></p>
+      <form id="decision-form">
+        <div id="code-fields">
+        <label for="confirmation">Confirmation code</label>
+        <input id="confirmation" autocomplete="off" placeholder="Type the code shown with the command">
+        </div>
+        <label for="approver">Approver</label>
+        <input id="approver" autocomplete="off" value="oncall" placeholder="Your on-call id">
+        <label for="command">Note</label>
+        <textarea id="command" placeholder="Add a note. The issue stays above."></textarea>
+        <div id="controls">
+          <div class="actions">
+            <button id="approve" type="button">Approve this command</button>
+            <button id="edit" class="quiet" type="button">Save note</button>
+            <button id="reject" class="quiet" type="button">Reject</button>
+          </div>
+          <p id="decision-hint" class="hint">Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.</p>
+        </div>
+      </form>
+    </div>
+  </div>
   <script>
     const list = document.querySelector("#list");
     const title = document.querySelector("#title");
@@ -394,7 +442,10 @@ PAGE = """<!DOCTYPE html>
     const controls = document.querySelector("#controls");
     const events = document.querySelector("#events");
     const approve = document.querySelector("#approve");
-    const shell = document.querySelector("main");
+    const hitlBanner = document.querySelector("#hitl-banner");
+    const hitlBannerText = document.querySelector("#hitl-banner-text");
+    const openHitl = document.querySelector("#open-hitl");
+    const closeHitl = document.querySelector("#close-hitl");
     const flagPolicy = "A checkout or payment incident also sets paymentFailure to off.";
     let current = null;
     let source = null;
@@ -402,6 +453,9 @@ PAGE = """<!DOCTYPE html>
     let view = "open";
     let sending = false;
     let listed = "";
+    let hitlDismissed = false;
+    let hitlKey = "";
+    let hitlWasOpen = false;
 
     function payloadOf(incident) {
       try { return JSON.parse(incident.payload); }
@@ -754,12 +808,28 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
+    function hitlLabel(pendingKind) {
+      if (pendingKind === "comms") return "A note is ready for your approval.";
+      if (pendingKind === "lessons") return "Lessons are ready for your approval.";
+      if (pendingKind === "action") return "A command is waiting for your approval.";
+      return "Human approval is needed before the agent continues.";
+    }
+
+    function setHitlOpen(openModal) {
+      const opening = openModal && decision.hidden;
+      decision.hidden = !openModal;
+      document.body.style.overflow = openModal ? "hidden" : "";
+      hitlWasOpen = openModal;
+      if (opening) {
+        const focusTarget = !document.querySelector("#code-fields").hidden ? confirmation : approve;
+        if (focusTarget && typeof focusTarget.focus === "function") focusTarget.focus();
+      }
+    }
+
     function show(incident) {
       renderAgent(incident);
       const open = isOpen(incident);
-      shell.classList.add("has-incident");
       stream.hidden = false;
-      decision.hidden = false;
       title.textContent = readableName(incident.service);
       issue.textContent = summaryOf(incident);
       alertName.textContent = readableName(incident.alert_name);
@@ -790,6 +860,14 @@ PAGE = """<!DOCTYPE html>
         && !incident.agent.running
         && !incident.agent.pending
         && Boolean(incident.agent.outcome);
+      const needsHitl = open && (waitingOnYou || agentFinishedOpen);
+      const nextKey = needsHitl
+        ? [incident.id, pendingKind || "finish", incident.confirmation_code || "", (incident.agent.pending || {}).command || ""].join("|")
+        : "";
+      if (nextKey !== hitlKey) {
+        hitlKey = nextKey;
+        hitlDismissed = false;
+      }
       const form = document.querySelector("#decision-form");
       form.hidden = open && !waitingForCode && !waitingOnYou;
       // Show controls for a real HITL wait, or to close a finished escalated/no-action incident.
@@ -804,6 +882,9 @@ PAGE = """<!DOCTYPE html>
         : needsTwo
           ? "Use two different Approver ids (oncall, then incident-commander). Approving twice as oncall does nothing."
           : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
+      hitlBannerText.textContent = hitlLabel(pendingKind);
+      hitlBanner.hidden = !needsHitl;
+      setHitlOpen(needsHitl && !hitlDismissed);
     }
 
     function renderReview(incident) {
@@ -825,14 +906,16 @@ PAGE = """<!DOCTYPE html>
 
     function showEmpty() {
       const closedView = view === "closed";
-      shell.classList.remove("has-incident");
       title.textContent = closedView ? "No closed incidents" : "No open incidents";
       state.textContent = closedView
         ? "Approved and rejected incidents show up here."
         : "Approved and rejected incidents stay on Closed.";
       state.className = "meta";
       stream.hidden = true;
-      decision.hidden = true;
+      hitlBanner.hidden = true;
+      hitlDismissed = false;
+      hitlKey = "";
+      setHitlOpen(false);
       command.value = "";
       issue.textContent = "";
       alertName.textContent = "";
@@ -929,6 +1012,8 @@ PAGE = """<!DOCTYPE html>
 
     function watch(id) {
       current = id;
+      hitlDismissed = false;
+      hitlKey = "";
       message.textContent = "";
       if (source) source.close();
       source = new EventSource("/incidents/" + id + "/stream");
@@ -936,6 +1021,8 @@ PAGE = """<!DOCTYPE html>
       source.addEventListener("missing", () => {
         current = null;
         source.close();
+        setHitlOpen(false);
+        hitlBanner.hidden = true;
         message.textContent = "That incident is no longer on the server.";
         loadList();
       });
@@ -1014,6 +1101,26 @@ PAGE = """<!DOCTYPE html>
     approve.addEventListener("click", () => send("approve"));
     document.querySelector("#edit").addEventListener("click", () => send("edit"));
     document.querySelector("#reject").addEventListener("click", () => send("reject"));
+    openHitl.addEventListener("click", () => {
+      hitlDismissed = false;
+      setHitlOpen(true);
+    });
+    closeHitl.addEventListener("click", () => {
+      hitlDismissed = true;
+      setHitlOpen(false);
+    });
+    decision.addEventListener("click", (event) => {
+      if (event.target === decision) {
+        hitlDismissed = true;
+        setHitlOpen(false);
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !decision.hidden) {
+        hitlDismissed = true;
+        setHitlOpen(false);
+      }
+    });
     loadList();
     setInterval(loadList, 5000);
   </script>
