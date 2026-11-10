@@ -695,10 +695,20 @@ class IncidentTools:
     def _activity(self, tool: str, args: dict) -> None:
         if self.on_activity is None:
             return
-        detail = args.get("service") or args.get("query") or args.get("id") or args.get("trace_id") or ""
+        detail = (
+            args.get("service")
+            or args.get("query")
+            or args.get("flag")
+            or args.get("id")
+            or args.get("trace_id")
+            or args.get("runbook_id")
+            or ""
+        )
         detail = " ".join(str(detail).split())[:80]
+        kind = _ACTIVITY_KIND.get(tool, "Tool")
         line = _ACTIVITY.get(tool, tool.replace("_", " "))
-        self.on_activity(f"{line}: {detail}." if detail else f"{line}.")
+        text = f"{kind} · {line}: {detail}." if detail else f"{kind} · {line}."
+        self.on_activity(text)
 
     def _trace(self, role, tool, args, ok, reason, result) -> None:
         if self.recorder is not None:
@@ -708,6 +718,25 @@ class IncidentTools:
                 "tool_call", role=role, tool=tool, args=args, ok=ok, reason=reason, evidence=sorted(ids)[:12]
             )
 
+
+_ACTIVITY_KIND = {
+    "promql_query": "Telemetry",
+    "log_search": "Telemetry",
+    "trace_search": "Telemetry",
+    "trace_get": "Telemetry",
+    "recent_changes": "Telemetry",
+    "service_topology": "Telemetry",
+    "runbook_search": "RAG",
+    "runbook_get": "RAG",
+    "memory_search": "Memory",
+    "memory_write": "Memory",
+    "incident_record_update": "Tickets",
+    "status_draft": "Tickets",
+    "postmortem_draft": "Tickets",
+    "status_publish_external": "Tickets",
+    "ops_dry_run": "Action",
+    "ops_set_flag": "Action",
+}
 
 _ACTIVITY = {
     "promql_query": "Checking metrics",

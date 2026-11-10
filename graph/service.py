@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -19,6 +20,8 @@ from agents.observability import AgentMetrics, tracing_callbacks
 from graph.incident_graph import GraphDeps, build_graph
 
 logger = logging.getLogger(__name__)
+
+_ACTIVITY_LOG_LIMIT = 12
 
 
 class AgentService:
@@ -39,6 +42,7 @@ class AgentService:
         self._threads: list[threading.Thread] = []
         self.errors: dict[str, str] = {}
         self.activity: dict[str, str] = {}
+        self.activity_log: dict[str, list[dict]] = {}
 
     def _config(self, incident_id: str) -> dict:
         return {"configurable": {"thread_id": incident_id}, "callbacks": tracing_callbacks()}
@@ -75,14 +79,18 @@ class AgentService:
             self._invoke(incident_id, value)
 
     def note_activity(self, incident_id: str, text: str) -> None:
-        """Show the tool the agent is using now. The graph only checkpoints when a step finishes."""
+        """Show the tool / LLM step the agent is on. The graph only checkpoints when a step finishes."""
         self.activity[incident_id] = text
+        log = self.activity_log.setdefault(incident_id, [])
+        log.append({"ts": time.time(), "text": text})
+        del log[:-_ACTIVITY_LOG_LIMIT]
         if self.publish_fn is None:
             return
         view = self.view(incident_id)
         if not view.get("status"):
             view["status"] = "investigating"
         view["activity"] = text
+        view["activity_log"] = list(log)
         view["running"] = True
         self.publish_fn(incident_id, view)
 
@@ -155,10 +163,12 @@ class AgentService:
             "events": (state.get("events") or [])[-15:],
             "running": bool(snapshot.next) and not snapshot.interrupts,
             "activity": self.activity.get(incident_id),
+            "activity_log": list(self.activity_log.get(incident_id) or []),
             "error": self.errors.get(incident_id),
         }
         if not result["running"]:
             result["activity"] = None
+            # Keep the recent log so Closed / paused views still show what was tried.
         return result
 
     def publish(self, incident_id: str) -> None:

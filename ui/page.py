@@ -113,11 +113,29 @@ PAGE = """<!DOCTYPE html>
     #live[hidden] { display: none; }
     #live-activity {
       margin: 0.35rem 0 0 1.5rem;
-      max-width: 38rem;
+      max-width: 42rem;
       color: var(--ink);
       font-size: 1.02rem;
     }
     #live-activity[hidden] { display: none; }
+    #activity-log {
+      list-style: none;
+      margin: 0.55rem 0 0;
+      padding: 0;
+      max-width: 42rem;
+    }
+    #activity-log[hidden] { display: none; }
+    #activity-log li {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr;
+      gap: 0.65rem;
+      padding: 0.28rem 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    #activity-log li:first-child { border-top: 0; color: var(--ink); font-weight: 560; }
+    #activity-log .kind { color: var(--muted); font-variant: all-small-caps; letter-spacing: 0.04em; }
     .pulse { display: inline-flex; gap: 0.22rem; align-items: center; height: 1rem; }
     .pulse[hidden], #phase[hidden] { display: none; }
     .pulse i {
@@ -262,6 +280,7 @@ PAGE = """<!DOCTYPE html>
             <span id="phase">Thinking</span>
           </div>
           <p id="live-activity" hidden></p>
+          <ol id="activity-log" hidden aria-label="Recent agent actions"></ol>
           <p id="pending"></p>
           <p id="agent-error" hidden></p>
           <p id="plan-focus" class="meta"></p>
@@ -480,12 +499,41 @@ PAGE = """<!DOCTYPE html>
     function plainActivity(text) {
       if (!text) return "";
       const named = text.match(/service="([^"]+)"/);
-      if (!named) return text;
-      const service = readableName(named[1]);
-      if (text.startsWith("Checking metrics")) return "Checking metrics for " + service + ".";
-      if (text.startsWith("Reading logs")) return "Reading logs for " + service + ".";
-      if (text.startsWith("Looking at traces")) return "Looking at traces for " + service + ".";
+      if (named) {
+        const service = readableName(named[1]);
+        return text
+          .replace(/service="[^"]+"/, service)
+          .replace("Checking metrics:", "Checking metrics for")
+          .replace("Reading logs:", "Reading logs for")
+          .replace("Looking at traces:", "Looking at traces for");
+      }
       return text;
+    }
+
+    function activityKind(text) {
+      const match = String(text || "").match(/^([A-Za-z]+) · /);
+      return match ? match[1] : "Step";
+    }
+
+    function activityBody(text) {
+      return String(text || "").replace(/^[A-Za-z]+ · /, "");
+    }
+
+    function renderActivityLog(view) {
+      const node = document.querySelector("#activity-log");
+      const rows = (view.activity_log || []).slice().reverse().slice(0, 8);
+      node.hidden = !rows.length;
+      node.replaceChildren();
+      for (const row of rows) {
+        const item = document.createElement("li");
+        const kind = document.createElement("span");
+        kind.className = "kind";
+        kind.textContent = activityKind(row.text);
+        const body = document.createElement("span");
+        body.textContent = plainActivity(activityBody(row.text));
+        item.append(kind, body);
+        node.appendChild(item);
+      }
     }
 
     function renderAgent(incident) {
@@ -537,7 +585,7 @@ PAGE = """<!DOCTYPE html>
       const activity = (!pending && view.running) ? plainActivity(view.activity) : "";
       const live = document.querySelector("#live");
       const liveActivity = document.querySelector("#live-activity");
-      // Phase + tool activity only while the graph is working — not the static plan reason.
+      // Phase + current tool/LLM line while working; recent log stays visible after pauses.
       live.hidden = !phase;
       document.querySelector("#live .pulse").hidden = !phase;
       const phaseNode = document.querySelector("#phase");
@@ -545,6 +593,7 @@ PAGE = """<!DOCTYPE html>
       phaseNode.textContent = phase;
       liveActivity.hidden = !activity;
       liveActivity.textContent = activity;
+      renderActivityLog(view);
       const detail = pending
         ? (pending.kind === "action" ? "Waiting for you to approve the command." :
           pending.kind === "comms" ? "Waiting for you to review the status notes. Approve publishes the external note." :

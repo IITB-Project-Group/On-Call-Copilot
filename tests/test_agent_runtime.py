@@ -263,12 +263,17 @@ def service_for(case_id="dev-f1-50pct", arch="c0", publish=None, metrics=None):
 def test_activity_is_visible_before_the_graph_has_a_checkpoint():
     seen = []
     service, _, _iid = service_for(publish=lambda _i, view: seen.append(view))
-    service.note_activity("not-started", "Searching runbooks.")
+    service.note_activity("not-started", "RAG · Searching runbooks: payment.")
     assert seen[-1]["status"] == "investigating"
-    assert seen[-1]["running"] is True and seen[-1]["activity"] == "Searching runbooks."
+    assert seen[-1]["running"] is True and seen[-1]["activity"] == "RAG · Searching runbooks: payment."
+    assert seen[-1]["activity_log"][-1]["text"] == "RAG · Searching runbooks: payment."
     service.publish_fn = None
-    service.note_activity("not-started", "Reading logs.")
-    assert service.activity["not-started"] == "Reading logs."
+    service.note_activity("not-started", "Telemetry · Reading logs: checkout.")
+    assert service.activity["not-started"] == "Telemetry · Reading logs: checkout."
+    assert [row["text"] for row in service.activity_log["not-started"]] == [
+        "RAG · Searching runbooks: payment.",
+        "Telemetry · Reading logs: checkout.",
+    ]
 
 
 def test_service_runs_to_each_decision_and_publishes_a_view():
