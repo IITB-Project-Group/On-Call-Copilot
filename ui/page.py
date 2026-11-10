@@ -232,6 +232,7 @@ PAGE = """<!DOCTYPE html>
       padding: 0.85rem 1rem;
       background: var(--panel);
       border: 1px solid var(--line);
+      max-width: 42rem;
     }
     .hitl-banner[hidden] { display: none; }
     .hitl-banner p { margin: 0; flex: 1 1 12rem; }
@@ -242,6 +243,19 @@ PAGE = """<!DOCTYPE html>
       color: var(--panel);
       border: 0;
       padding: 0.42rem 0.85rem;
+    }
+    #close-finished {
+      margin: 1rem 0 0;
+      max-width: 42rem;
+    }
+    #close-finished[hidden] { display: none; }
+    #close-finished button {
+      font: inherit;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      padding: 0.35rem 0.7rem;
     }
     .decision {
       position: fixed;
@@ -399,6 +413,9 @@ PAGE = """<!DOCTYPE html>
           <p id="hitl-banner-text">Human approval is needed before the agent continues.</p>
           <button id="open-hitl" type="button">Review approval</button>
         </div>
+        <p id="close-finished" hidden>
+          <button id="open-close" type="button">Close this incident</button>
+        </p>
         <section id="checked" class="detail-section" aria-label="What was checked">
           <h2>What was checked</h2>
           <ol id="events" class="events"></ol>
@@ -462,6 +479,8 @@ PAGE = """<!DOCTYPE html>
     const hitlBanner = document.querySelector("#hitl-banner");
     const hitlBannerText = document.querySelector("#hitl-banner-text");
     const openHitl = document.querySelector("#open-hitl");
+    const closeFinished = document.querySelector("#close-finished");
+    const openClose = document.querySelector("#open-close");
     const closeHitl = document.querySelector("#close-hitl");
     const flagPolicy = "A checkout or payment incident also sets paymentFailure to off.";
     let current = null;
@@ -825,11 +844,10 @@ PAGE = """<!DOCTYPE html>
       }
     }
 
-    function hitlLabel(pendingKind, finished) {
+    function hitlLabel(pendingKind) {
       if (pendingKind === "comms") return "A note is ready for your approval.";
       if (pendingKind === "lessons") return "Lessons are ready for your approval.";
       if (pendingKind === "action") return "A command is waiting for your approval.";
-      if (finished) return "The agent finished. Open review only if you want to close this incident.";
       return "Human approval is needed before the agent continues.";
     }
 
@@ -911,8 +929,10 @@ PAGE = """<!DOCTYPE html>
         : needsTwo
           ? "Use two different Approver ids (oncall, then incident-commander). Approving twice as oncall does nothing."
           : "Save note keeps this incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.";
-      hitlBannerText.textContent = hitlLabel(pendingKind, agentFinishedOpen);
-      hitlBanner.hidden = !(open && (waitingOnYou || agentFinishedOpen));
+      // Banner only for real HITL. Finished/escalated gets a quiet Close control, not a review prompt.
+      hitlBannerText.textContent = hitlLabel(pendingKind);
+      hitlBanner.hidden = !(open && waitingOnYou);
+      closeFinished.hidden = !(open && agentFinishedOpen && !waitingOnYou);
       setHitlOpen(autoHitl && !hitlDismissed);
     }
 
@@ -942,6 +962,7 @@ PAGE = """<!DOCTYPE html>
       state.className = "meta";
       stream.hidden = true;
       hitlBanner.hidden = true;
+      closeFinished.hidden = true;
       hitlDismissed = false;
       hitlKey = "";
       setHitlOpen(false);
@@ -1131,6 +1152,10 @@ PAGE = """<!DOCTYPE html>
     document.querySelector("#edit").addEventListener("click", () => send("edit"));
     document.querySelector("#reject").addEventListener("click", () => send("reject"));
     openHitl.addEventListener("click", () => {
+      hitlDismissed = false;
+      setHitlOpen(true);
+    });
+    openClose.addEventListener("click", () => {
       hitlDismissed = false;
       setHitlOpen(true);
     });
