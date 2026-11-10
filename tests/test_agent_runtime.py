@@ -438,6 +438,21 @@ def test_decision_while_the_agent_is_still_working_is_refused(tmp_path, monkeypa
     assert response.json()["detail"] == "the agent is still working"
 
 
+def test_finished_escalated_incident_can_be_closed(tmp_path, monkeypatch):
+    monkeypatch.delenv("COPILOT_WEBHOOK_SECRET", raising=False)
+    app, agent = make_app(tmp_path, {"COPILOT_AGENT": "c0", "COPILOT_TRACES_DIR": str(tmp_path / "t")}, {})
+    api = TestClient(app)
+    incident_id = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
+    monkeypatch.setattr(agent, "pending", lambda _incident_id: None)
+    monkeypatch.setattr(
+        agent, "view", lambda _incident_id: {"running": False, "outcome": "escalated", "pending": None}
+    )
+    closed = api.post(f"/incidents/{incident_id}/decision", json={"decision": "approve"})
+    assert closed.status_code == 200
+    assert closed.json()["decision"] == "approve"
+    assert closed.json()["agent"]["outcome"] == "escalated"
+
+
 def test_live_agent_copies_ticket_drafts_into_the_store(tmp_path, monkeypatch):
     monkeypatch.delenv("COPILOT_WEBHOOK_SECRET", raising=False)
     app, agent = make_app(tmp_path, {"COPILOT_AGENT": "c0", "COPILOT_TRACES_DIR": str(tmp_path / "t")}, {})
