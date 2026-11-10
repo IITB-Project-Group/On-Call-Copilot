@@ -17,7 +17,7 @@ from agents.context import AgentContext
 from agents.handoffs import ActionSpec, TriageReport
 from agents.llm import ModelFactory, ScriptedChatModel, openrouter_chat, tool_call
 from agents.memory.lessons import LessonStore, lesson_store, open_store, playbook_hash
-from agents.observability import AgentMetrics, Recorder, tracing_callbacks
+from agents.observability import AgentMetrics, Recorder, configure_tracing, tracing_callbacks
 from agents.react import run_react, trim_tool_results
 from agents.remediation import build_plan, inverse
 from agents.toolbox import (
@@ -517,3 +517,45 @@ def test_recorder_writes_jsonl_and_metrics_observe(tmp_path, monkeypatch):
     assert registry.get_sample_value("copilot_agent_halted_total", {"reason": "loop_repeat"}) == 1
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     assert tracing_callbacks() == []
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    assert configure_tracing() is False
+
+
+def test_configure_tracing_exports_to_the_collector(monkeypatch):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "incident-api")
+    installed = {}
+
+    class Provider:
+        def __init__(self, resource=None):
+            installed["resource"] = resource
+
+        def add_span_processor(self, processor):
+            installed["processor"] = processor
+
+    class Exporter:
+        def __init__(self):
+            installed["exporter"] = self
+
+    class Processor:
+        def __init__(self, exporter):
+            installed["span_exporter"] = exporter
+
+    import opentelemetry.exporter.otlp.proto.http.trace_exporter as otlp
+    import opentelemetry.sdk.trace as sdk_trace
+    import opentelemetry.sdk.trace.export as sdk_export
+    import opentelemetry.trace as otel_trace
+
+    monkeypatch.setattr(sdk_trace, "TracerProvider", Provider)
+    monkeypatch.setattr(sdk_export, "BatchSpanProcessor", Processor)
+    monkeypatch.setattr(otlp, "OTLPSpanExporter", Exporter)
+    monkeypatch.setattr(
+        otel_trace, "set_tracer_provider", lambda provider: installed.update(provider=provider)
+    )
+
+    assert configure_tracing() is True
+    assert installed["resource"].attributes["service.name"] == "incident-api"
+    assert isinstance(installed["span_exporter"], Exporter)
+    assert installed["provider"] is not None
+    assert configure_tracing({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318"}) is True
+    assert installed["resource"].attributes["service.name"] == "incident-api"

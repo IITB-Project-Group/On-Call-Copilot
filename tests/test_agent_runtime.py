@@ -413,7 +413,24 @@ def test_api_runs_the_agent_and_resumes_on_decisions(tmp_path, monkeypatch):
         f"/incidents/{iid}/decision", json={"decision": "approve", "approver": "incident-commander"}
     ).json()
     assert done["agent"]["outcome"] == "resolved"
-    assert api.post(f"/incidents/{iid}/decision", json={"decision": "approve"}).status_code == 409
+    # Graph finished with no pending interrupt: approve/reject closes the open incident row.
+    closed = api.post(f"/incidents/{iid}/decision", json={"decision": "approve"})
+    assert closed.status_code == 200 and closed.json()["decision"] == "approve"
+    assert (
+        api.post(f"/incidents/{iid}/decision", json={"decision": "edit", "text": "note"}).status_code == 409
+    )
+
+
+def test_decision_while_the_agent_is_still_working_is_refused(tmp_path, monkeypatch):
+    monkeypatch.delenv("COPILOT_WEBHOOK_SECRET", raising=False)
+    app, agent = make_app(tmp_path, {"COPILOT_AGENT": "c0", "COPILOT_TRACES_DIR": str(tmp_path / "t")}, {})
+    api = TestClient(app)
+    incident_id = api.post("/webhooks/alert", json=ALERT).json()["incidents"][0]["id"]
+    monkeypatch.setattr(agent, "pending", lambda _incident_id: None)
+    monkeypatch.setattr(agent, "view", lambda _incident_id: {"running": True})
+    response = api.post(f"/incidents/{incident_id}/decision", json={"decision": "approve"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "the agent is still working"
 
 
 def test_live_agent_copies_ticket_drafts_into_the_store(tmp_path, monkeypatch):

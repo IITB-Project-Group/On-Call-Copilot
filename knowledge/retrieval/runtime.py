@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from .build_index import load_retrieval_documents
@@ -43,6 +44,8 @@ def initialize_retrieval_service(
     This initializer does not embed or write corpus passages, so startup cannot
     unexpectedly trigger a batch of embedding charges.
     """
+    if persist_directory is None:
+        persist_directory = os.environ.get("COPILOT_CHROMA_DIR") or None
     source_directory = Path(knowledge_dir or (_REPOSITORY_ROOT / "knowledge"))
     documents = load_retrieval_documents(source_directory)
     if not documents:
