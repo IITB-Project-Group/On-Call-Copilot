@@ -1,0 +1,22 @@
+name: on-call-copilot-eval
+version: '2026-11-10'
+seed: 13
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+built_by: python -m eval.dataset.build
+counts:
+  production: 50
+  golden: 30
+  adversarial: 20
+  regression: 13
+ratios:
+  production: 0.5
+  golden: 0.3
+  adversarial: 0.2
+production_verdicts:
+  pass: 33
+  fail: 17
+distinct_inputs:
+  production: 20
+  golden: 30
+  adversarial: 20
+  regression: 13

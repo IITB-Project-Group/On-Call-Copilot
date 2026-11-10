@@ -1,0 +1,67 @@
+id: prod-042
+split: dev
+source: production
+derived_from: dev-noise-startup-burst
+written_on: '2026-11-10'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: frontend
+noise: startup_burst
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+trace:
+  run: e4-memory-off-b5
+  experiment: e4-c2-memory-off-b5
+  architecture: c2
+  memory: false
+  budget: 5
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-noise-startup-burst-2fed75
+  path: eval/results/twin-model/traces/e4-memory-off-b5/dev-noise-startup-burst-2fed75.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: fail
+  failure_modes:
+  - false_alarm_not_closed
+  outcome: escalated
+  top1_service: false
+  top1_fault: false
+  top3_service: false
+  correct_action: true
+  verified_recovery: false
+  severity_correct: false
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 8
+  cost_usd: 0.02951
+  latency_s: 61.866
+  top_hypotheses:
+  - service: frontend
+    fault_type: error_injection
+    flag: null
+    status: inconclusive
+  - service: frontend
+    fault_type: latency
+    flag: null
+    status: inconclusive
+  - service: frontend
+    fault_type: resource_exhaustion
+    flag: null
+    status: inconclusive
+  actions: []

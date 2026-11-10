@@ -1,0 +1,73 @@
+id: reg-f1-50pct
+split: dev
+source: regression
+derived_from: dev-f1-50pct
+written_on: '2026-11-10'
+inject:
+- flag: paymentFailure
+  variant: 50%
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: checkout
+ground_truth:
+  faults:
+  - service: payment
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: paymentFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV1
+  knock_on_services:
+  - checkout
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: payment
+  - type: restart_service
+    args:
+      service: checkout
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+regression:
+  bugs:
+    harmful_proposed: 2
+    unverified_recovery: 2
+    wrong_top1_service: 2
+  failed_runs: 2 of 8
+  first_seen:
+    run: e1-c2-single-investigator
+    experiment: e1-c2-single-investigator
+    architecture: c2
+    memory: true
+    budget: 10
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-f1-50pct-f06fb7
+    path: eval/results/twin-model/traces/e1-c2-single-investigator/dev-f1-50pct-f06fb7.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e1-c2-single-investigator/dev-f1-50pct-f06fb7.jsonl
+  - eval/results/twin-model/traces/e1-c2-team/dev-f1-50pct-a4feb8.jsonl
+  must: success
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: checkout
+  - type: rollback_deploy
+    args:
+      service: checkout
+      to_version: null
+  status: open

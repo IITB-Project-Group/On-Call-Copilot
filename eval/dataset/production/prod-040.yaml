@@ -1,0 +1,58 @@
+id: prod-040
+split: dev
+source: production
+derived_from: dev-noise-flagd-stream
+written_on: '2026-11-10'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: flagd
+noise: flagd_stream
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: flagd
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+trace:
+  run: e4-memory-off-b10
+  experiment: e4-c2-memory-off
+  architecture: c2
+  memory: false
+  budget: 10
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-noise-flagd-stream-f11375
+  path: eval/results/twin-model/traces/e4-memory-off-b10/dev-noise-flagd-stream-f11375.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: fail
+  failure_modes:
+  - false_alarm_not_closed
+  outcome: escalated
+  top1_service: true
+  top1_fault: true
+  top3_service: true
+  correct_action: true
+  verified_recovery: false
+  severity_correct: false
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 12
+  cost_usd: 0.021905
+  latency_s: 26.617
+  top_hypotheses: []
+  actions: []

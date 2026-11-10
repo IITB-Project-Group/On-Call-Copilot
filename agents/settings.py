@@ -85,6 +85,9 @@ class Experiment:
     learn: bool = True
     repeats: int = 1
     models: dict[str, str] = field(default_factory=dict)
+    # Overrides the agents' sampling temperature (commander and specialists; never the judge or the
+    # reflection model). pass@k/pass^k runs use it to see how much unreliability sampling adds.
+    temperature: float | None = None
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -92,6 +95,8 @@ class Experiment:
             raise ValueError(f"architecture must be one of {ARCHITECTURES}")
         if self.budget < 1:
             raise ValueError("budget must be at least 1")
+        if self.temperature is not None and not 0.0 <= self.temperature <= 2.0:
+            raise ValueError("temperature must be between 0 and 2")
 
     def model_id(self, role: str, config: dict[str, Any] | None = None) -> str:
         if role in self.models:
@@ -100,6 +105,14 @@ class Experiment:
 
     def with_budget(self, budget: int) -> Experiment:
         return replace(self, budget=budget, name=f"{self.name}-b{budget}")
+
+    def with_temperature(self, temperature: float) -> Experiment:
+        return replace(self, temperature=temperature, name=f"{self.name}-t{temperature:g}")
+
+    def temperature_for(self, slot: str, config: dict[str, Any] | None = None) -> float:
+        if self.temperature is not None and slot in ("commander", "specialist"):
+            return self.temperature
+        return float((config or load_config())["models"][slot].get("temperature", 0.0))
 
 
 def load_experiment(path: str | Path) -> Experiment:

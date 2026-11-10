@@ -1,0 +1,85 @@
+id: prod-018
+split: dev
+source: production
+derived_from: dev-f10-steady-state-normal
+written_on: '2026-11-10'
+inject:
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: KafkaConsumerLagHigh
+  service: accounting
+ground_truth:
+  faults:
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV4
+  knock_on_services:
+  - fraud-detection
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: kafka_lag
+    comparator: <
+    threshold: 100
+    sustain_samples: 3
+    window_s: 300
+trace:
+  run: e4-memory-off-b20
+  experiment: e4-c2-memory-off-b20
+  architecture: c2
+  memory: false
+  budget: 20
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-f10-steady-state-normal-c7d3de
+  path: eval/results/twin-model/traces/e4-memory-off-b20/dev-f10-steady-state-normal-c7d3de.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: pass
+  failure_modes: []
+  outcome: resolved
+  top1_service: false
+  top1_fault: true
+  top3_service: true
+  correct_action: true
+  verified_recovery: true
+  severity_correct: true
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 28
+  cost_usd: 0.021914
+  latency_s: 31.867
+  top_hypotheses:
+  - service: accounting
+    fault_type: queue_backlog
+    flag: kafkaQueueProblems
+    status: supported
+  - service: kafka
+    fault_type: queue_backlog
+    flag: kafkaQueueProblems
+    status: supported
+  - service: accounting
+    fault_type: resource_exhaustion
+    flag: null
+    status: refuted
+  actions:
+  - type: set_flag
+    args:
+      flag: kafkaQueueProblems
+      enabled: false

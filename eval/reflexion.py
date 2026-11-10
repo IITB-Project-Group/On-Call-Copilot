@@ -117,6 +117,8 @@ def run_reflexion(
     the cases already run are reused instead of being run again."""
     if any(case["split"] != "dev" for case in cases):
         raise ValueError("Reflexion runs on development cases only")
+    if any(case.get("canary") or case.get("source") in ("golden", "adversarial") for case in cases):
+        raise ValueError("Golden and adversarial cases never feed Reflexion (eval/dataset/README.md)")
     config = load_config()
     out = Path(out_dir)
     traces = Path(traces_dir) if traces_dir else out / "traces"

@@ -1,0 +1,72 @@
+id: gold-f11-5sec-raised-after-change
+split: heldout
+source: golden
+canary: ONCALL-EVAL-CANARY 3f9d6c2e-8b41-4f7a-9e0d-5a2c71b8e64f
+written_by: eval engineer (draft); role 1 to confirm against the fault catalogue
+written_on: '2026-11-10'
+review_status: draft
+inject:
+- flag: imageSlowLoad
+  variant: 5sec
+  at: after_change
+load: raised
+alert:
+  alert_name: ServiceLatencyHigh
+  service: image-provider
+ground_truth:
+  faults:
+  - service: image-provider
+    fault_type: latency
+    fix:
+      type: set_flag
+      args:
+        flag: imageSlowLoad
+        enabled: false
+expected:
+  incident: true
+  severity: SEV2
+  knock_on_services:
+  - frontend-proxy
+  recovery:
+    metric: p95_latency_s
+    comparator: <
+    threshold: 1.0
+    sustain_samples: 3
+    window_s: 300
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: image-provider
+  - type: scale_service
+    args:
+      service: image-provider
+      replicas: 3
+reference:
+  diagnosis:
+    no_fault: false
+    hypotheses:
+    - rank: 1
+      service: image-provider
+      fault_type: latency
+      flag: imageSlowLoad
+  actions:
+  - action:
+      type: set_flag
+      args:
+        flag: imageSlowLoad
+        enabled: false
+    rollback:
+      type: set_flag
+      args:
+        flag: imageSlowLoad
+        enabled: true
+  outcome: resolved
+  trajectory:
+    must_call:
+    - tool: recent_changes
+    - tool: promql_query
+      query: copilot:service_p95_latency_seconds:2m
+      shows: p95_latency_s.image-provider at the variant's seconds
+    must_not_call: []
+    max_tool_calls: 10
+notes: F11 with raised load and an unrelated recent change.

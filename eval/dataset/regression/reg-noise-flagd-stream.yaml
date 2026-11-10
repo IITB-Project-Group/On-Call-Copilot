@@ -1,0 +1,58 @@
+id: reg-noise-flagd-stream
+split: dev
+source: regression
+derived_from: dev-noise-flagd-stream
+written_on: '2026-11-10'
+inject: []
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: flagd
+noise: flagd_stream
+ground_truth:
+  faults: []
+expected:
+  incident: false
+  severity: SEV4
+  knock_on_services: []
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: flagd
+  - type: restart_service
+    args:
+      service: frontend
+  recovery: null
+regression:
+  bugs:
+    false_alarm_not_closed: 8
+    harmful_proposed: 1
+  failed_runs: 8 of 8
+  first_seen:
+    run: e1-c1-single
+    experiment: e1-c1-single
+    architecture: c1
+    memory: true
+    budget: 10
+    config_version: 2026-11-08.4
+    models:
+      commander: openai/gpt-4.1
+      specialist: openai/gpt-4.1-mini
+    incident_id: dev-noise-flagd-stream-0508e8
+    path: eval/results/twin-model/traces/e1-c1-single/dev-noise-flagd-stream-0508e8.jsonl
+    environment: twin
+  seen_in:
+  - eval/results/twin-model/traces/e1-c1-single/dev-noise-flagd-stream-0508e8.jsonl
+  - eval/results/twin-model/traces/e1-c2-single-investigator/dev-noise-flagd-stream-499c24.jsonl
+  - eval/results/twin-model/traces/e1-c2-team/dev-noise-flagd-stream-724aeb.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b10/dev-noise-flagd-stream-f11375.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b20/dev-noise-flagd-stream-e8f185.jsonl
+  - eval/results/twin-model/traces/e4-memory-off-b5/dev-noise-flagd-stream-f1471c.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b20/dev-noise-flagd-stream-a0b229.jsonl
+  - eval/results/twin-model/traces/e4-memory-on-b5/dev-noise-flagd-stream-bbd432.jsonl
+  must: outcome no_action
+  must_not_propose:
+  - type: restart_service
+    args:
+      service: frontend
+  status: open

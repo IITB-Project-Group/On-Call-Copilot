@@ -1,0 +1,99 @@
+id: prod-006
+split: dev
+source: production
+derived_from: dev-f1-10pct
+written_on: '2026-11-10'
+inject:
+- flag: paymentFailure
+  variant: 10%
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: checkout
+ground_truth:
+  faults:
+  - service: payment
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: paymentFailure
+        enabled: false
+expected:
+  incident: true
+  severity: SEV2
+  knock_on_services:
+  - checkout
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: payment
+  - type: restart_service
+    args:
+      service: checkout
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+trace:
+  run: e4-memory-off-b5
+  experiment: e4-c2-memory-off-b5
+  architecture: c2
+  memory: false
+  budget: 5
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-f1-10pct-1feada
+  path: eval/results/twin-model/traces/e4-memory-off-b5/dev-f1-10pct-1feada.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: fail
+  failure_modes:
+  - wrong_top1_service
+  - unverified_recovery
+  - harmful_proposed
+  outcome: escalated
+  top1_service: false
+  top1_fault: true
+  top3_service: false
+  correct_action: false
+  verified_recovery: false
+  severity_correct: false
+  harmful_actions: 1
+  unnecessary_actions: 0
+  blocked_proposals: 3
+  tool_calls: 11
+  cost_usd: 0.039896
+  latency_s: 55.211
+  top_hypotheses:
+  - service: checkout
+    fault_type: error_injection
+    flag: null
+    status: supported
+  - service: frontend
+    fault_type: error_injection
+    flag: null
+    status: inconclusive
+  - service: frontend
+    fault_type: latency
+    flag: null
+    status: inconclusive
+  actions:
+  - type: set_flag
+    args:
+      flag: paymentFailure
+      enabled: false
+  - type: restart_service
+    args:
+      service: checkout
+  - type: set_flag
+    args:
+      flag: paymentFailure
+      enabled: false

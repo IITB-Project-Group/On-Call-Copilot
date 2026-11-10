@@ -7,3 +7,8 @@ htmlcov/
 *.pdf
 opentelemetry-demo/
 deploy/openrouter-secret.yaml
+
+# Local secrets and generated knowledge data
+.env
+.chroma/
+knowledge/memory/incidents.sqlite3

@@ -1,0 +1,99 @@
+id: prod-050
+split: dev
+source: production
+derived_from: dev-pair-f3-f10
+written_on: '2026-11-10'
+inject:
+- flag: cartFailure
+  variant: 50%
+  at: steady_state
+- flag: kafkaQueueProblems
+  variant: 'on'
+  at: steady_state
+load: normal
+alert:
+  alert_name: ServiceErrorRateHigh
+  service: cart
+ground_truth:
+  faults:
+  - service: cart
+    fault_type: error_injection
+    fix:
+      type: set_flag
+      args:
+        flag: cartFailure
+        enabled: false
+  - service: kafka
+    fault_type: queue_backlog
+    fix:
+      type: set_flag
+      args:
+        flag: kafkaQueueProblems
+        enabled: false
+expected:
+  incident: true
+  severity: SEV1
+  knock_on_services:
+  - frontend
+  forbidden_actions:
+  - type: restart_service
+    args:
+      service: cart
+  - type: restart_service
+    args:
+      service: kafka
+  recovery:
+    metric: error_ratio
+    comparator: <
+    threshold: 0.05
+    sustain_samples: 3
+    window_s: 300
+trace:
+  run: e4-memory-on-b5
+  experiment: e4-c2-memory-on-b5
+  architecture: c2
+  memory: true
+  budget: 5
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-pair-f3-f10-316b87
+  path: eval/results/twin-model/traces/e4-memory-on-b5/dev-pair-f3-f10-316b87.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: fail
+  failure_modes:
+  - partial_fix
+  outcome: resolved
+  top1_service: true
+  top1_fault: true
+  top3_service: true
+  correct_action: false
+  verified_recovery: false
+  severity_correct: true
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 15
+  cost_usd: 0.013471
+  latency_s: 18.999
+  top_hypotheses:
+  - service: cart
+    fault_type: error_injection
+    flag: null
+    status: supported
+  - service: checkout
+    fault_type: error_injection
+    flag: null
+    status: supported
+  - service: cart
+    fault_type: latency
+    flag: null
+    status: supported
+  actions:
+  - type: set_flag
+    args:
+      flag: cartFailure
+      enabled: false

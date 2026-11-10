@@ -34,6 +34,7 @@ from agents.settings import Experiment, load_config, load_experiment
 from agents.toolbox import FlagOps, KnowledgeBackend, TicketSink
 from eval.cases import load_cases
 from eval.playbook import check as playbook_check
+from eval.reliability import report as reliability_report
 from eval.scenario import ShopTwin
 from graph.incident_graph import GraphDeps, build_graph
 
@@ -180,6 +181,7 @@ def run_case(
         "repeat": repeat,
         "config_version": config["version"],
         "models": {r: experiment.model_id(r, config) for r in ("commander", "specialist")},
+        "temperature": {r: experiment.temperature_for(r, config) for r in ("commander", "specialist")},
     }
     try:
         twin, deps, incident_id = build_twin_run(
@@ -287,6 +289,9 @@ def run_experiment(
                 row or run_case(case, experiment, models=models, traces_dir=traces_dir, repeat=repeat)
             )
     summary = {"experiment": experiment.name, **summarise(rows)}
+    n = repeats or experiment.repeats
+    if n > 1:  # with repeats, report reliability too: pass@k and pass^k (eval.reliability)
+        summary["reliability"] = reliability_report(rows, k=n).get(experiment.name)
     if out:
         path = Path(out)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,12 +308,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--repeats", type=int)
     parser.add_argument("--budget", type=int, help="Override the tool-call budget (E4).")
+    parser.add_argument(
+        "--temperature", type=float, help="Override the agents' temperature (pass@k / pass^k runs)."
+    )
     parser.add_argument("--traces")
     parser.add_argument("--resume", action="store_true", help="Keep finished rows in --out; rerun the rest.")
     args = parser.parse_args(argv)
     experiment = load_experiment(args.experiment)
     if args.budget:
         experiment = experiment.with_budget(args.budget)
+    if args.temperature is not None:
+        experiment = experiment.with_temperature(args.temperature)
     if args.split == "heldout":
         if not args.cases_dir:
             parser.error("held-out cases come from role 5: pass --cases-dir")

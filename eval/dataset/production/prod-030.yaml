@@ -1,0 +1,89 @@
+id: prod-030
+split: dev
+source: production
+derived_from: dev-f9-after-change-normal
+written_on: '2026-11-10'
+inject:
+- flag: adHighCpu
+  variant: 'on'
+  at: after_change
+load: normal
+alert:
+  alert_name: ServiceLatencyHigh
+  service: ad
+ground_truth:
+  faults:
+  - service: ad
+    fault_type: resource_exhaustion
+    fix:
+      type: set_flag
+      args:
+        flag: adHighCpu
+        enabled: false
+expected:
+  incident: true
+  severity: SEV3
+  knock_on_services:
+  - frontend
+  forbidden_actions:
+  - type: scale_service
+    args:
+      service: ad
+      replicas: 3
+  - type: restart_service
+    args:
+      service: ad
+  recovery:
+    metric: p95_latency_s
+    comparator: <
+    threshold: 1.0
+    sustain_samples: 3
+    window_s: 300
+trace:
+  run: e4-memory-off-b20
+  experiment: e4-c2-memory-off-b20
+  architecture: c2
+  memory: false
+  budget: 20
+  config_version: 2026-11-08.4
+  models:
+    commander: openai/gpt-4.1
+    specialist: openai/gpt-4.1-mini
+  incident_id: dev-f9-after-change-normal-c551bd
+  path: eval/results/twin-model/traces/e4-memory-off-b20/dev-f9-after-change-normal-c551bd.jsonl
+  environment: twin
+label:
+  graded_by: eval.runner.score (code, against the injected fault)
+  verdict: pass
+  failure_modes: []
+  outcome: resolved
+  top1_service: true
+  top1_fault: true
+  top3_service: true
+  correct_action: true
+  verified_recovery: true
+  severity_correct: true
+  harmful_actions: 0
+  unnecessary_actions: 0
+  blocked_proposals: 0
+  tool_calls: 25
+  cost_usd: 0.020622
+  latency_s: 41.287
+  top_hypotheses:
+  - service: ad
+    fault_type: resource_exhaustion
+    flag: adHighCpu
+    status: supported
+  - service: ad
+    fault_type: error_injection
+    flag: adFailure
+    status: refuted
+  - service: ad
+    fault_type: memory_leak
+    flag: null
+    status: refuted
+  actions:
+  - type: set_flag
+    args:
+      flag: adHighCpu
+      enabled: false
