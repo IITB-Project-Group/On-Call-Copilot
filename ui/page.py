@@ -1146,8 +1146,8 @@ PAGE = """<!DOCTYPE html>
           body: JSON.stringify({
             decision: decisionName,
             text: command.value,
-            confirmation: confirmation.value,
-            approver: document.querySelector("#approver").value || "oncall"
+            confirmation: confirmation.value.trim(),
+            approver: (document.querySelector("#approver").value || "oncall").trim()
           })
         });
         if (!response.ok) {
@@ -1194,6 +1194,9 @@ PAGE = """<!DOCTYPE html>
           setHitlMessage("Recorded. This command still needs approval before it runs.");
         } else if (stillPending) {
           setHitlMessage("Recorded. Next review is ready.");
+        } else if (body.agent && body.agent.running) {
+          setHitlMessage("Approved. The agent is applying the command and will verify recovery.");
+          setHitlOpen(false);
         } else {
           setHitlMessage("Recorded. The agent is continuing.");
         }

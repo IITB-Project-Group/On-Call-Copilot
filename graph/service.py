@@ -58,6 +58,43 @@ class AgentService:
         if wait and thread is not None:
             thread.join(timeout)
 
+    def resume_decision(self, incident_id: str, decision: dict, *, timeout: float = 20.0) -> dict:
+        """Resume and wait only until this HITL step settles — not through act/verify.
+
+        Approve used to ``join`` the whole resume thread, so the console sat on Working… for the
+        full verification window (~45s+) and looked broken. Reject felt fine because it returns sooner.
+        """
+        before = self.pending(incident_id)
+        before_kind = None if before is None else before.get("kind")
+        before_events = len((self.view(incident_id).get("events") or []))
+        needed = int((before or {}).get("required_approvals") or 1)
+        self._run(incident_id, Command(resume=decision))
+        deadline = time.time() + timeout
+        view = self.view(incident_id)
+        while time.time() < deadline:
+            view = self.view(incident_id)
+            current = self.pending(incident_id)
+            current_kind = None if current is None else current.get("kind")
+            events = view.get("events") or []
+            # Fully approved action → interrupt cleared; act/verify continue in the background.
+            if before_kind == "action" and current_kind != "action":
+                return view
+            # SEV1 first vote (or duplicate) leaves action pending but appends an approval event.
+            if (
+                before_kind == "action"
+                and current_kind == "action"
+                and needed > 1
+                and len(events) > before_events
+            ):
+                return view
+            # Reject / edit / comms / lessons moved to a different wait or finished.
+            if current_kind != before_kind:
+                return view
+            if not view.get("running") and current is None and view.get("outcome"):
+                return view
+            time.sleep(0.1)
+        return view
+
     def resume_unfinished(self, incident_ids: list[str]) -> list[str]:
         """Continue runs that stopped mid-step (process killed). Runs waiting for a person stay waiting."""
         resumed = []

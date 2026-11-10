@@ -281,6 +281,35 @@ def test_activity_is_visible_before_the_graph_has_a_checkpoint():
     ]
 
 
+def test_resume_decision_returns_before_verification_finishes():
+    """Approve must not block on the multi-minute verify window."""
+    import time
+
+    service, twin, iid = service_for()
+    service.run_async = True
+    service.start(iid, twin.alert())
+    service.wait(timeout=15)
+    pending = service.pending(iid)
+    assert pending and pending["kind"] == "action"
+    started = time.time()
+    view = service.resume_decision(
+        iid,
+        {
+            "decision": "approve",
+            "approver": "oncall",
+            "confirmation": pending["confirmation_code"],
+            "text": "",
+            "comms_approver": "oncall",
+        },
+        timeout=15,
+    )
+    assert time.time() - started < 12
+    # Either the action interrupt cleared, or a dual-control vote was recorded quickly.
+    cur = service.pending(iid)
+    assert cur is None or cur.get("kind") != "action" or len(view.get("events") or []) > 0
+    service.wait(timeout=30)
+
+
 def test_service_runs_to_each_decision_and_publishes_a_view():
     from agents.observability import AgentMetrics
 
