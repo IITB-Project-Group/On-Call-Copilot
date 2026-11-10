@@ -70,6 +70,46 @@ def test_experiments_validate_and_split_the_same_budget(tmp_path):
     assert settings.load_experiment(path).architecture == "c1"
 
 
+def test_models_file_overrides_packaged_ids(tmp_path, monkeypatch):
+    overlay = tmp_path / "models.yaml"
+    overlay.write_text(
+        "version: 'live'\nmodels:\n  commander: {id: openai/gpt-4.1-mini, temperature: 0.1}\n"
+        "  provider: openrouter\n  extra: {id: z/z}\npricing:\n  openai/gpt-4.1-mini: {input_per_mtok: 1, output_per_mtok: 2}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(overlay))
+    settings.load_config.cache_clear()
+    try:
+        config = settings.load_config()
+        assert config["models"]["commander"] == {
+            "id": "openai/gpt-4.1-mini",
+            "temperature": 0.1,
+            "max_tokens": 1200,
+        }
+        assert config["models"]["specialist"]["id"] == "openai/gpt-4.1-mini"
+        assert config["models"]["provider"] == "openrouter"
+        assert config["pricing"]["openai/gpt-4.1-mini"]["input_per_mtok"] == 1
+        assert config["models"]["extra"] == {"id": "z/z"}
+        assert config["version"] == "live"
+    finally:
+        settings.load_config.cache_clear()
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("", encoding="utf-8")
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(empty))
+    settings.load_config.cache_clear()
+    try:
+        assert settings.load_config()["version"] == "2026-11-10.1"
+    finally:
+        settings.load_config.cache_clear()
+    missing = tmp_path / "absent.yaml"
+    monkeypatch.setenv("COPILOT_MODELS_FILE", str(missing))
+    settings.load_config.cache_clear()
+    try:
+        assert settings.load_config()["models"]["commander"]["id"] == "openai/gpt-6-luna"
+    finally:
+        settings.load_config.cache_clear()
+
+
 # ---------------------------------------------------------------- models
 def test_openrouter_model_needs_a_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)

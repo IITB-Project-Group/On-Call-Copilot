@@ -669,8 +669,10 @@ class IncidentTools:
     evidence: set = field(default_factory=set)
     span_ids: set = field(default_factory=set)
     calls: int = 0
+    on_activity: Any = None
 
     def call(self, role: str, tool: str, hook_args: dict, *, cacheable: bool = True) -> tuple[bool, Any, str]:
+        self._activity(tool, hook_args)
         key = sha256_hex(canonical_json([tool, hook_args]))
         if cacheable and key in self.cache:
             self._trace(role, tool, hook_args, True, "cached", self.cache[key])
@@ -690,6 +692,14 @@ class IncidentTools:
         self._trace(role, tool, hook_args, outcome.ok, outcome.reason, result)
         return outcome.ok, result, outcome.reason
 
+    def _activity(self, tool: str, args: dict) -> None:
+        if self.on_activity is None:
+            return
+        detail = args.get("service") or args.get("query") or args.get("id") or args.get("trace_id") or ""
+        detail = " ".join(str(detail).split())[:80]
+        line = _ACTIVITY.get(tool, tool.replace("_", " "))
+        self.on_activity(f"{line}: {detail}." if detail else f"{line}.")
+
     def _trace(self, role, tool, args, ok, reason, result) -> None:
         if self.recorder is not None:
             ids: set[str] = set()
@@ -697,6 +707,26 @@ class IncidentTools:
             self.recorder.event(
                 "tool_call", role=role, tool=tool, args=args, ok=ok, reason=reason, evidence=sorted(ids)[:12]
             )
+
+
+_ACTIVITY = {
+    "promql_query": "Checking metrics",
+    "log_search": "Reading logs",
+    "trace_search": "Looking at traces",
+    "trace_get": "Reading one trace",
+    "recent_changes": "Checking recent changes",
+    "service_topology": "Checking which services call each other",
+    "runbook_search": "Searching runbooks",
+    "runbook_get": "Reading a runbook",
+    "memory_search": "Looking up past lessons",
+    "memory_write": "Saving a lesson",
+    "incident_record_update": "Updating the incident record",
+    "status_draft": "Drafting the status note",
+    "postmortem_draft": "Drafting the postmortem",
+    "status_publish_external": "Publishing the status note",
+    "ops_dry_run": "Checking the command before it runs",
+    "ops_set_flag": "Changing a feature flag",
+}
 
 
 def _unique_metric_ids(result: dict, query_id: str) -> dict:

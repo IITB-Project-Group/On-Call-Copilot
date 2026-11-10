@@ -6,6 +6,7 @@ experiment name and the exact model IDs it used.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
@@ -30,6 +31,25 @@ def load_config(path: str | None = None) -> dict[str, Any]:
         missing = [slot for slot in SLOTS if slot not in prompt]
         if missing:
             raise ValueError(f"prompt {name} is missing slots {missing}")
+    models_file = os.environ.get("COPILOT_MODELS_FILE", "").strip()
+    if models_file and Path(models_file).is_file():
+        with open(models_file, encoding="utf-8") as handle:
+            _merge_models(config, yaml.safe_load(handle) or {})
+    return config
+
+
+def _merge_models(config: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    """Replace model slots from a ConfigMap file. Unmentioned slots stay as packaged."""
+    for role, slot in (overlay.get("models") or {}).items():
+        current = config["models"].get(role)
+        if isinstance(slot, dict) and isinstance(current, dict):
+            config["models"][role] = {**current, **slot}
+        else:
+            config["models"][role] = slot
+    for model_id, price in (overlay.get("pricing") or {}).items():
+        config["pricing"][model_id] = price
+    if overlay.get("version"):
+        config["version"] = str(overlay["version"])
     return config
 
 

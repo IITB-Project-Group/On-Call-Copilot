@@ -260,6 +260,17 @@ def service_for(case_id="dev-f1-50pct", arch="c0", publish=None, metrics=None):
     return AgentService(deps, InMemorySaver(), run_async=False, publish=publish, metrics=metrics), twin, iid
 
 
+def test_activity_is_visible_before_the_graph_has_a_checkpoint():
+    seen = []
+    service, _, _iid = service_for(publish=lambda _i, view: seen.append(view))
+    service.note_activity("not-started", "Searching runbooks.")
+    assert seen[-1]["status"] == "investigating"
+    assert seen[-1]["running"] is True and seen[-1]["activity"] == "Searching runbooks."
+    service.publish_fn = None
+    service.note_activity("not-started", "Reading logs.")
+    assert service.activity["not-started"] == "Reading logs."
+
+
 def test_service_runs_to_each_decision_and_publishes_a_view():
     from agents.observability import AgentMetrics
 

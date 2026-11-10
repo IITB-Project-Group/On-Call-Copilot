@@ -31,11 +31,14 @@ class AgentService:
         metrics: AgentMetrics | None = None,
         publish: Callable[[str, dict], None] | None = None,
     ):
-        self.deps, self.graph = deps, build_graph(deps, checkpointer)
+        self.deps = deps
+        self.deps.on_activity = self.note_activity
+        self.graph = build_graph(deps, checkpointer)
         self.run_async, self.metrics, self.publish_fn = run_async, metrics, publish
         self._locks: dict[str, threading.Lock] = {}
         self._threads: list[threading.Thread] = []
         self.errors: dict[str, str] = {}
+        self.activity: dict[str, str] = {}
 
     def _config(self, incident_id: str) -> dict:
         return {"configurable": {"thread_id": incident_id}, "callbacks": tracing_callbacks()}
@@ -71,9 +74,44 @@ class AgentService:
         else:
             self._invoke(incident_id, value)
 
+    def note_activity(self, incident_id: str, text: str) -> None:
+        """Show the tool the agent is using now. The graph only checkpoints when a step finishes."""
+        self.activity[incident_id] = text
+        if self.publish_fn is None:
+            return
+        view = self.view(incident_id)
+        if not view.get("status"):
+            view["status"] = "investigating"
+        view["activity"] = text
+        view["running"] = True
+        self.publish_fn(incident_id, view)
+
+    def _announce(self, incident_id: str) -> None:
+        """Show that work has started. The graph publishes again when it pauses or finishes."""
+        if self.publish_fn is None:
+            return
+        self.publish_fn(
+            incident_id,
+            {
+                "status": "investigating",
+                "running": True,
+                "outcome": None,
+                "plan": None,
+                "plan_versions": [],
+                "hypotheses": [],
+                "proposal": None,
+                "verification": None,
+                "pending": None,
+                "events": [],
+                "error": None,
+            },
+        )
+
     def _invoke(self, incident_id: str, value: Any) -> None:
         lock = self._locks.setdefault(incident_id, threading.Lock())
         with lock:
+            if not isinstance(value, Command):
+                self._announce(incident_id)
             try:
                 self.graph.invoke(value, self._config(incident_id))
                 self.errors.pop(incident_id, None)
@@ -91,7 +129,7 @@ class AgentService:
         state = snapshot.values or {}
         pending = snapshot.interrupts[0].value if snapshot.interrupts else None
         proposal = state.get("proposal") or {}
-        return {
+        result = {
             "status": state.get("status"),
             "outcome": state.get("outcome"),
             "plan": state.get("plan"),
@@ -116,8 +154,12 @@ class AgentService:
             },
             "events": (state.get("events") or [])[-15:],
             "running": bool(snapshot.next) and not snapshot.interrupts,
+            "activity": self.activity.get(incident_id),
             "error": self.errors.get(incident_id),
         }
+        if not result["running"]:
+            result["activity"] = None
+        return result
 
     def publish(self, incident_id: str) -> None:
         view = self.view(incident_id)

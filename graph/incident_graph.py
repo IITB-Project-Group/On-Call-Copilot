@@ -115,6 +115,7 @@ class GraphDeps:
     traces_dir: str | None = None
     sleep: Callable[[float], None] = time.sleep
     on_update: Callable[[str, dict], None] | None = None
+    on_activity: Callable[[str, str], None] | None = None
     sessions: dict = field(default_factory=dict)
 
     def executor_for(self, incident_id: str) -> GuardedExecutor:
@@ -155,7 +156,14 @@ class GraphDeps:
             path = f"{self.traces_dir}/{incident_id}.jsonl" if self.traces_dir else None
             recorder = Recorder(incident_id, path)
             executor = self.executor_for(incident_id)
-            tools = IncidentTools(executor, incident_id, recorder)
+            tools = IncidentTools(
+                executor,
+                incident_id,
+                recorder,
+                on_activity=None
+                if self.on_activity is None
+                else (lambda text: self.on_activity(incident_id, text)),
+            )
             available = set(executor.tools)
             ctx = AgentContext(
                 incident_id,

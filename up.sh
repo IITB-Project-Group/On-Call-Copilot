@@ -150,16 +150,41 @@ fi
 echo "Building the incident API image."
 docker build --load -f "${ROOT}/incident_api/Dockerfile" -t "${IMAGE_NAME}" "${ROOT}"
 kind load docker-image "${IMAGE_NAME}" --name "${CLUSTER_NAME}"
-# The key stays in the openrouter secret. The deployment reads it and starts without it.
+# Models are deploy/copilot-models.yaml. The key is the shell variable, or deploy/openrouter-secret.yaml.
+echo "Applying the copilot-models ConfigMap."
+kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/copilot-models.yaml"
+secret_updated=0
+secret_file="${ROOT}/deploy/openrouter-secret.yaml"
+if [[ -z "${OPENROUTER_API_KEY:-}" && -f "${secret_file}" ]]; then
+  OPENROUTER_API_KEY="$(
+    awk '
+      $1 == "api-key:" {
+        val = $0
+        sub(/^[[:space:]]*api-key:[[:space:]]*/, "", val)
+        gsub(/^["'\'']|["'\'']$/, "", val)
+        print val
+        exit
+      }
+    ' "${secret_file}"
+  )"
+  if [[ -z "${OPENROUTER_API_KEY}" || "${OPENROUTER_API_KEY}" == "REPLACE_ME" ]]; then
+    unset OPENROUTER_API_KEY
+    echo "deploy/openrouter-secret.yaml has no api-key. The API uses the fixed workflow."
+  fi
+fi
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-  echo "Storing OPENROUTER_API_KEY in secret openrouter."
+  echo "Storing the OpenRouter key in secret openrouter."
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" create secret generic openrouter \
     --from-literal=api-key="${OPENROUTER_API_KEY}" \
     --dry-run=client -o yaml |
     kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" apply -f -
+  secret_updated=1
+else
+  echo "No OpenRouter key. Copy deploy/openrouter-secret.example.yaml to deploy/openrouter-secret.yaml, or export OPENROUTER_API_KEY. The API uses the fixed workflow."
 fi
+unset OPENROUTER_API_KEY
 kubectl --context "${KUBE_CONTEXT}" apply -f "${ROOT}/deploy/incident-api.yaml"
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+if (( secret_updated == 1 )); then
   kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout restart deployment/incident-api
 fi
 kubectl --context "${KUBE_CONTEXT}" --namespace "${NAMESPACE}" rollout status deployment/incident-api --timeout=180s

@@ -50,6 +50,9 @@ spec:
                   optional: true
             - name: COPILOT_AGENT
               value: c2
+            # Model ids come from the copilot-models ConfigMap. The image file is the fallback.
+            - name: COPILOT_MODELS_FILE
+              value: /etc/copilot/models.yaml
           readinessProbe:
             httpGet:
               path: /healthz
@@ -59,6 +62,9 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: models
+              mountPath: /etc/copilot
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -68,6 +74,9 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
+        - name: models
+          configMap:
+            name: copilot-models
 ---
 apiVersion: v1
 kind: Service
