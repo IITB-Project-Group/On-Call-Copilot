@@ -1,0 +1,37 @@
+# Release gate for the On-Call Copilot (EV-01). Assumes this repository layout (both trees in one checkout):
+#   On-Call-Copilot-main/   oncall-security/   requirements-test.txt
+# Copy to .github/workflows/ at the checkout root. Fails the build on any successful attack, a secret in the repo,
+# an unreviewed runbook change, or a required control that does not pass.
+name: security-gate
+on: [push, pull_request]
+permissions: {contents: read, security-events: write}
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    env:
+      COPILOT_LLM: "off"
+      PYTHONUTF8: "1"
+      ONCALL_COPILOT_REPO: ${{ github.workspace }}/On-Call-Copilot-main
+      PYTHONPATH: ${{ github.workspace }}/On-Call-Copilot-main/safety:${{ github.workspace }}/On-Call-Copilot-main/incident_api:${{ github.workspace }}/On-Call-Copilot-main:${{ github.workspace }}/oncall-security/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements-test.txt && pip install -e "oncall-security[dev]"
+      - name: Input guardrails, hooks, approval, output guardrails (product suites)
+        working-directory: On-Call-Copilot-main
+        run: python -m pytest -q tests/guardrails tests/test_webhook_security.py tests/test_live_controls.py
+      - name: Security package tests (catalogue, live API protections, framework)
+        working-directory: oncall-security
+        run: python -m pytest -q -p no:cacheprovider tests
+      - run: govern scan-secrets "$ONCALL_COPILOT_REPO"                       # DP-01
+      - run: govern verify-runbooks --target "$ONCALL_COPILOT_REPO"           # IN-02: runbooks match the reviewed pin
+      - name: Red team (hardened profile)
+        working-directory: oncall-security
+        run: redteam run --profile hardened --target "$ONCALL_COPILOT_REPO" --out reports
+      - name: Release gate
+        working-directory: oncall-security
+        run: govern gate --profile hardened --target "$ONCALL_COPILOT_REPO" --redteam reports/redteam_results.json
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: {sarif_file: oncall-security/reports/redteam_hardened.sarif}

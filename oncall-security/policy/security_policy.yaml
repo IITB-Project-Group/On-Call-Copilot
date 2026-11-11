@@ -1,0 +1,42 @@
+# Security policy as code for the On-Call Copilot (owner: security_policy). Reviewed quarterly.
+owners:
+  security_policy: "Domain & product lead (role 1)"
+  red_team: "Evaluation & red-team engineer (role 5)"
+  guardrails: "Tools, control & security engineer (role 4)"
+  operations: "Deployment & operations engineer (role 6)"
+  risk_register: "Domain & product lead (role 1)"
+risk_register:
+  last_review: "2026-10-31"
+  max_age_days: 90
+redteam:
+  cadence_days: 30                # and before every release
+  max_successful: {critical: 0, high: 0, medium: 0, low: 0}
+  max_false_positive_rate: 0.01   # benign telemetry wrongly quarantined
+controls:
+  required: [AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, IV-01, IV-02, IV-03, IV-04, OV-01, RS-01, RS-02, RS-03,
+             IN-01, IN-02, IN-03, IN-04, IN-05, DP-01, DP-03, MON-01, EV-01]
+risk:
+  max_residual_score: 8           # no medium/high residual risk may ship ...
+  acceptances:                    # ... unless formally accepted: named owner, reason, expiry; void if a linked attack succeeds
+    R-11:
+      owner: "Tools, control & security engineer (role 4)"
+      until: "2027-01-31"
+      max_residual: 9
+      reason: >-
+        Pattern-based detection cannot be complete. Undetected text still cannot cause a change (typed actions,
+        validate_plan, exact-command human approval). Re-assess at each monthly red-team run; void if any
+        PI-OBF attack succeeds.
+api:
+  allow_demo: false
+  rate_limit_per_minute: 120
+  alert_rate_limit_per_minute: 30
+  max_body_bytes: 65536
+  # webhook_secret: set COPILOT_WEBHOOK_SECRET in the environment, never here
+monitor:
+  window_s: 600
+  injection_burst: 3
+  denied_storm: 10
+  spoof_disable_after: 2
+  min_review_s: 3
+  auth_failures: 5
+  contain: true
