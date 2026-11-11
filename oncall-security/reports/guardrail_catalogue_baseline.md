@@ -1,0 +1,6 @@
+| ID | Family | Rule | T | Case | Expected | Actual | Result |
+|---|---|---|---|---|---|---|---|
+| OUT-MEM-01 | Memory writes | OG-28 | N | Reviewed lesson from a verified incident is stored | allow | allow | PASS |
+| OUT-MEM-02 | Memory writes | OG-28 | P | Lesson without preconditions is refused | block | block | PASS |
+| OUT-MEM-03 | Memory writes | OG-28 | P | Write while memory is frozen is refused | block | block | PASS |
+| OUT-MEM-04 | Memory writes | OG-28 | P | Lesson from an unverified incident is refused | block | block | PASS |

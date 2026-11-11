@@ -28,7 +28,7 @@ TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
     ("ghp_" + "a" * 36, "github_token"),
     ("xoxb-1234567890-abcdefghij", "slack_token"),
     ("AIza" + "B" * 35, "google_api_key"),
-    ("sk_live_" + "c" * 24, "stripe_key"),
+    ("sk_" + "live_" + "c" * 24, "stripe_key"),
     ("sk-ant-" + "d" * 30, "llm_api_key"),
     ("password=SuperSecret!", "key_value_secret"),
     ('{"api_key": "zzz-123-yyy"}', "key_value_secret"),

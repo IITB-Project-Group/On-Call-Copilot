@@ -1,0 +1,129 @@
+{
+ "system": "On-Call Copilot",
+ "model": "gpt-4.1-mini (OpenRouter/OpenAI) or deterministic policy",
+ "roles": {
+  "commander": [
+   "incident_record_update",
+   "recent_changes",
+   "service_topology"
+  ],
+  "triage": [
+   "incident_record_update",
+   "log_search",
+   "promql_query",
+   "promql_range_query",
+   "recent_changes",
+   "service_topology",
+   "trace_get",
+   "trace_search"
+  ],
+  "diagnosis": [
+   "log_search",
+   "promql_query",
+   "promql_range_query",
+   "recent_changes",
+   "service_topology",
+   "trace_get",
+   "trace_search"
+  ],
+  "runbook": [
+   "memory_search",
+   "runbook_get",
+   "runbook_search"
+  ],
+  "remediation": [
+   "log_search",
+   "ops_dry_run",
+   "ops_restart_service",
+   "ops_rollback_deploy",
+   "ops_scale_service",
+   "ops_set_flag",
+   "promql_query",
+   "promql_range_query",
+   "recent_changes",
+   "service_topology",
+   "trace_get",
+   "trace_search"
+  ],
+  "comms": [
+   "postmortem_draft",
+   "status_draft",
+   "status_publish_external",
+   "trace_get"
+  ],
+  "memory": [
+   "memory_search",
+   "memory_write"
+  ],
+  "reflection": [
+   "memory_search",
+   "runbook_get",
+   "runbook_search"
+  ],
+  "investigator": [
+   "log_search",
+   "memory_search",
+   "promql_query",
+   "promql_range_query",
+   "recent_changes",
+   "runbook_get",
+   "runbook_search",
+   "service_topology",
+   "trace_get",
+   "trace_search"
+  ]
+ },
+ "write_tools": [
+  "incident_record_update",
+  "memory_write",
+  "ops_restart_service",
+  "ops_rollback_deploy",
+  "ops_scale_service",
+  "ops_set_flag",
+  "postmortem_draft",
+  "status_draft",
+  "status_publish_external"
+ ],
+ "tools": [
+  "incident_record_update",
+  "log_search",
+  "memory_search",
+  "ops_dry_run",
+  "ops_restart_service",
+  "ops_rollback_deploy",
+  "ops_scale_service",
+  "ops_set_flag",
+  "postmortem_draft",
+  "promql_query",
+  "promql_range_query",
+  "recent_changes",
+  "runbook_get",
+  "runbook_search",
+  "service_topology",
+  "status_draft",
+  "status_publish_external",
+  "trace_search"
+ ],
+ "data_flows": [
+  "Prometheus -> telemetry tools -> input guardrails -> agents",
+  "OpenSearch logs / Jaeger traces -> input guardrails -> agents",
+  "agents -> output guardrails -> approval service -> ops-actions -> shop",
+  "agents -> comms -> status notes (external needs approval)",
+  "lessons -> memory (human review, frozen) -> runbook agent"
+ ],
+ "human_roles": [
+  "oncall",
+  "incident_commander",
+  "comms_lead",
+  "security_admin",
+  "viewer"
+ ],
+ "external_dependencies": [
+  "OpenRouter / OpenAI API",
+  "Prometheus",
+  "OpenSearch",
+  "Jaeger",
+  "flagd",
+  "Docker API (live)"
+ ]
+}
