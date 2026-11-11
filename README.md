@@ -87,27 +87,7 @@ Stop the incident port-forward and delete the cluster with:
 
 An alert reports that a service error rate has stayed above 5% over the last five minutes.
 
-```mermaid
-flowchart TD
-    alert[Alertmanager] --> api[Incident API and live stream]
-    api --> guardIn[Input guardrails]
-    guardIn --> commander[Incident commander]
-    commander --> triage[Triage agent]
-    commander --> diagnosis[Diagnosis agents in parallel]
-    commander --> runbook[Runbook agent]
-    triage --> commander
-    diagnosis --> commander
-    runbook --> commander
-    commander --> gate[Approval gate]
-    gate --> engineer[On-call engineer]
-    engineer --> remediate[Remediation agent]
-    remediate --> verify{Recovered?}
-    verify -->|yes| comms[Comms agent]
-    verify -->|no| rollback[Roll back and replan]
-    rollback --> commander
-    comms --> review[Human review]
-    review --> memory[Incident memory]
-```
+The redrawn submission figures (system architecture + C2 graph) and the full numbered walkthrough live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Summary:
 
 1. Prometheus fires, and Alertmanager (or a Grafana alert) calls the incident API. The engineer watches the investigation stream. Input guardrails treat telemetry as data and redact secrets.
 2. The incident commander plans the work: scope, form hypotheses, test, act, verify, and communicate. It replans when evidence disagrees with the current hypothesis.
