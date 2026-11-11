@@ -4,6 +4,7 @@ Users and service accounts hold random API tokens; only SHA-256 hashes are store
 authenticated with ``Authorization: Bearer <token>`` (or ``?token=`` for the SSE stream, which browsers
 cannot send headers on). The authenticated identity -- never a field in the request body -- is the approver.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,7 +16,15 @@ from typing import Iterable, Optional
 
 import yaml
 
-ROLES = {"viewer", "oncall", "incident_commander", "comms_lead", "security_admin", "alertmanager", "prometheus"}
+ROLES = {
+    "viewer",
+    "oncall",
+    "incident_commander",
+    "comms_lead",
+    "security_admin",
+    "alertmanager",
+    "prometheus",
+}
 
 # endpoint permission matrix (least privilege)
 PERMISSIONS = {
@@ -57,8 +66,12 @@ class UserStore:
     @classmethod
     def from_yaml(cls, path: str) -> "UserStore":
         doc = yaml.safe_load(open(path, encoding="utf-8")) or {}
-        return cls({u["id"]: User(u["id"], frozenset(u["roles"]), u["token_sha256"], u.get("active", True))
-                    for u in doc.get("users", [])})
+        return cls(
+            {
+                u["id"]: User(u["id"], frozenset(u["roles"]), u["token_sha256"], u.get("active", True))
+                for u in doc.get("users", [])
+            }
+        )
 
     @classmethod
     def generate(cls, spec: Iterable[tuple[str, Iterable[str]]]) -> tuple["UserStore", dict[str, str]]:
@@ -95,6 +108,12 @@ def allowed(user: User, permission: str) -> bool:
     return bool(user.roles & PERMISSIONS[permission])
 
 
-DEFAULT_TEAM = [("alice", ["oncall"]), ("bob", ["incident_commander"]), ("carol", ["comms_lead"]),
-                ("dana", ["security_admin"]), ("victor", ["viewer"]), ("alertmanager", ["alertmanager"]),
-                ("prometheus", ["prometheus"])]
+DEFAULT_TEAM = [
+    ("alice", ["oncall"]),
+    ("bob", ["incident_commander"]),
+    ("carol", ["comms_lead"]),
+    ("dana", ["security_admin"]),
+    ("victor", ["viewer"]),
+    ("alertmanager", ["alertmanager"]),
+    ("prometheus", ["prometheus"]),
+]

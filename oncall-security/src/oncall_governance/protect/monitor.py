@@ -10,6 +10,7 @@ Detection rules (thresholds from policy/security_policy.yaml -> monitor):
   SM-07 secret in output         secret pattern found in a published note                   -> CRITICAL, pause approvals
 Every event is appended to the tamper-evident audit log and counted in TELEMETRY (security.events).
 """
+
 from __future__ import annotations
 
 import os
@@ -20,12 +21,21 @@ from typing import Any, Optional
 
 from guardrail_core import TELEMETRY
 
-DEFAULTS = {"window_s": 600, "injection_burst": 3, "denied_storm": 10, "spoof_disable_after": 2,
-            "min_review_s": 3, "auth_failures": 5, "contain": True}
+DEFAULTS = {
+    "window_s": 600,
+    "injection_burst": 3,
+    "denied_storm": 10,
+    "spoof_disable_after": 2,
+    "min_review_s": 3,
+    "auth_failures": 5,
+    "contain": True,
+}
 
 
 class SecurityMonitor:
-    def __init__(self, approvals: Any = None, audit: Any = None, cfg: Optional[dict] = None, store: Any = None) -> None:
+    def __init__(
+        self, approvals: Any = None, audit: Any = None, cfg: Optional[dict] = None, store: Any = None
+    ) -> None:
         self.approvals, self.audit, self.store = approvals, audit, store
         self.cfg = {**DEFAULTS, **(cfg or {})}
         self.events: list[dict] = []
@@ -42,7 +52,10 @@ class SecurityMonitor:
             self.events.append(e)
         TELEMETRY.inc("security.events", rule=rule, severity=severity)
         if self.audit is not None:
-            self.audit.append("security.event", {"rule": rule, "severity": severity, **{k: str(v)[:120] for k, v in data.items()}})
+            self.audit.append(
+                "security.event",
+                {"rule": rule, "severity": severity, **{k: str(v)[:120] for k, v in data.items()}},
+            )
         return e
 
     def _count(self, key: str) -> int:
@@ -67,21 +80,29 @@ class SecurityMonitor:
         if kind != "counter":
             return
         if name == "guardrail.injections" and self._count("inj") == self.cfg["injection_burst"]:
-            self.event("SM-01_injection_burst", "high", {"source": labels.get("source"), "window_s": self.cfg["window_s"]})
+            self.event(
+                "SM-01_injection_burst",
+                "high",
+                {"source": labels.get("source"), "window_s": self.cfg["window_s"]},
+            )
         if name == "agent.tool_calls_blocked" and self._count("denied") == self.cfg["denied_storm"]:
             self.event("SM-02_denied_call_storm", "high", {"role": labels.get("role")})
             self.contain("pause_approvals", "agent keeps attempting blocked calls")
 
     def spoof_attempt(self, user: str, claimed: str, request_id: str) -> None:
         self._spoofs[user] += 1
-        self.event("SM-03_approver_spoofing", "high", {"user": user, "claimed": claimed, "request": request_id})
+        self.event(
+            "SM-03_approver_spoofing", "high", {"user": user, "claimed": claimed, "request": request_id}
+        )
         if self._spoofs[user] >= self.cfg["spoof_disable_after"] and self.store is not None:
             self.store.disable(user)
             self.contain("disable_user", f"{user} repeatedly claimed other identities")
 
     def approval_decided(self, user: str, req: Any, decision: str) -> None:
         if decision == "allow" and time.time() - req.created_at < self.cfg["min_review_s"]:
-            self.event("SM-04_rubber_stamp", "low", {"user": user, "seconds": round(time.time() - req.created_at, 2)})
+            self.event(
+                "SM-04_rubber_stamp", "low", {"user": user, "seconds": round(time.time() - req.created_at, 2)}
+            )
 
     def auth_failure(self, source: str, path: str) -> None:
         if self._count(f"auth:{source}") == self.cfg["auth_failures"]:
@@ -96,6 +117,7 @@ class SecurityMonitor:
 
     def check_published(self, text: str) -> bool:
         from input_guardrails import SecretRedactor
+
         _, found = SecretRedactor().redact_text(text)
         if found:
             self.event("SM-07_secret_in_output", "critical", {"kinds": sorted(found)})

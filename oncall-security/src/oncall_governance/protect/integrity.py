@@ -7,6 +7,7 @@
 * anchor_audit                     -- writes the audit chain head to an external anchor file so truncation or
   wholesale replacement of the log is detectable.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,13 +16,23 @@ import json
 import time
 from pathlib import Path
 
-SAFETY_CRITICAL = ["guardrail_core.py", "input_guardrails.py", "output_guardrails.py", "approval_service.py", "hooks.py",
-                   "oncall_copilot/safety.py", "oncall_copilot/shop_tools.py", "oncall_copilot/tools/toolbox.py",
-                   "oncall_copilot/agents/remediation.py", "oncall_copilot/api/server.py"]
+SAFETY_CRITICAL = [
+    "guardrail_core.py",
+    "input_guardrails.py",
+    "output_guardrails.py",
+    "approval_service.py",
+    "hooks.py",
+    "oncall_copilot/safety.py",
+    "oncall_copilot/shop_tools.py",
+    "oncall_copilot/tools/toolbox.py",
+    "oncall_copilot/agents/remediation.py",
+    "oncall_copilot/api/server.py",
+]
 
 
 def sign_runbooks(runbook_dir: Path, key: bytes) -> dict[str, str]:
     from input_guardrails import InputGuardrails
+
     ig, sigs = InputGuardrails(), {}
     for p in sorted(Path(runbook_dir).glob("*.json")):
         rb = json.loads(p.read_text(encoding="utf-8"))
@@ -31,6 +42,7 @@ def sign_runbooks(runbook_dir: Path, key: bytes) -> dict[str, str]:
 
 def verify_runbooks(runbook_dir: Path, key: bytes, signatures: dict[str, str]) -> dict[str, str]:
     from input_guardrails import InputGuardrails
+
     ig, out = InputGuardrails(), {}
     for p in sorted(Path(runbook_dir).glob("*.json")):
         rb = json.loads(p.read_text(encoding="utf-8"))
@@ -40,19 +52,28 @@ def verify_runbooks(runbook_dir: Path, key: bytes, signatures: dict[str, str]) -
 
 
 def code_manifest(src_root: Path) -> dict[str, str]:
-    return {f: hashlib.sha256((Path(src_root) / f).read_bytes()).hexdigest() for f in SAFETY_CRITICAL
-            if (Path(src_root) / f).exists()}
+    return {
+        f: hashlib.sha256((Path(src_root) / f).read_bytes()).hexdigest()
+        for f in SAFETY_CRITICAL
+        if (Path(src_root) / f).exists()
+    }
 
 
 def verify_code(src_root: Path, manifest: dict[str, str]) -> dict[str, str]:
     now = code_manifest(src_root)
-    return {f: ("ok" if now.get(f) == h else "MODIFIED" if f in now else "MISSING") for f, h in manifest.items()}
+    return {
+        f: ("ok" if now.get(f) == h else "MODIFIED" if f in now else "MISSING") for f, h in manifest.items()
+    }
 
 
 def anchor_audit(audit, anchor_path: Path) -> dict:
     entries = audit.entries()
-    rec = {"t": time.time(), "entries": len(entries), "head": entries[-1]["hash"] if entries else None,
-           "verified": audit.verify()}
+    rec = {
+        "t": time.time(),
+        "entries": len(entries),
+        "head": entries[-1]["hash"] if entries else None,
+        "verified": audit.verify(),
+    }
     with open(anchor_path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
     return rec
@@ -71,8 +92,14 @@ def check_anchor(audit, anchor_path: Path) -> bool:
 # ---------------------------------------------------------------------- live product: Markdown runbooks
 def pin_markdown_runbooks(runbook_dir: Path, manifest_path: Path, reviewer: str) -> dict:
     """Record the SHA-256 of every reviewed runbook (knowledge/runbooks/*.md). Run only after a human review."""
-    files = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(runbook_dir).glob("*.md"))}
-    doc = {"reviewed_by": reviewer, "pinned_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "runbooks": files}
+    files = {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(runbook_dir).glob("*.md"))
+    }
+    doc = {
+        "reviewed_by": reviewer,
+        "pinned_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "runbooks": files,
+    }
     Path(manifest_path).write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
     return doc
 

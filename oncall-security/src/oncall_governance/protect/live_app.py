@@ -14,6 +14,7 @@ serves ``/webhooks/alert``, ``/incidents`` and ``/incidents/{id}/decision`` from
   * confirmation codes are visible only to people who may approve (viewers see ``******``)
   * per-identity rate limits, a webhook rate limit, a request-size limit, ``Cache-Control: no-store``
 """
+
 from __future__ import annotations
 
 import json
@@ -30,8 +31,10 @@ _INCIDENT = re.compile(r"^/incidents/[^/]+$")
 _DECISION = re.compile(r"^/incidents/([^/]+)/decision$")
 _STREAM = re.compile(r"^/incidents/[^/]+/stream$")
 _CODE = re.compile(rb'("confirmation_code":\s*")([^"]*)(")')
-_EXTRA_HEADERS = [(b"cache-control", b"no-store"),
-                  (b"permissions-policy", b"camera=(), microphone=(), geolocation=()")]
+_EXTRA_HEADERS = [
+    (b"cache-control", b"no-store"),
+    (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
+]
 DECISION_PERMISSION = {"approve": "approve_action", "reject": "reject", "edit": "reject"}
 
 
@@ -39,32 +42,43 @@ def route_permission(method: str, path: str) -> Optional[str]:
     """Permission a route needs; ``"public"`` for health; ``None`` = not exposed (404)."""
     if method == "GET" and path == "/healthz":
         return "public"
-    if method == "GET" and path in ("/", "/incidents") or method == "GET" and (_INCIDENT.match(path) or _STREAM.match(path)):
+    if (
+        method == "GET"
+        and path in ("/", "/incidents")
+        or method == "GET"
+        and (_INCIDENT.match(path) or _STREAM.match(path))
+    ):
         return "read"
     if method == "GET" and path == "/metrics":
         return "metrics"
     if method == "POST" and path == "/webhooks/alert":
         return "ingest_alert"
     if method == "POST" and _DECISION.match(path):
-        return "decide"            # refined per decision once the body is read
+        return "decide"  # refined per decision once the body is read
     return None
 
 
 class HardenedIncidentAPI:
-    def __init__(self, app: Any, store: UserStore, policy: Optional[dict] = None,
-                 monitor: Optional[SecurityMonitor] = None) -> None:
+    def __init__(
+        self,
+        app: Any,
+        store: UserStore,
+        policy: Optional[dict] = None,
+        monitor: Optional[SecurityMonitor] = None,
+    ) -> None:
         self.app, self.store = app, store
         api = (policy or {}).get("api", {})
         gate = getattr(getattr(app, "state", None), "gate", None)
         self.audit = getattr(gate, "audit", None)
-        self.monitor = monitor or SecurityMonitor(getattr(gate, "approvals", None), self.audit,
-                                                  (policy or {}).get("monitor", {}), store)
+        self.monitor = monitor or SecurityMonitor(
+            getattr(gate, "approvals", None), self.audit, (policy or {}).get("monitor", {}), store
+        )
         self.limiter = RateLimiter(int(api.get("rate_limit_per_minute", 120)))
         self.alert_limiter = RateLimiter(int(api.get("alert_rate_limit_per_minute", 30)))
         self.max_body = int(api.get("max_body_bytes", 64 * 1024))
 
     @property
-    def state(self):           # so callers can still reach app.state.store / app.state.gate
+    def state(self):  # so callers can still reach app.state.store / app.state.gate
         return self.app.state
 
     # ------------------------------------------------------------------ ASGI
@@ -114,12 +128,20 @@ class HardenedIncidentAPI:
 
         async def guarded_send(message):
             if message["type"] == "http.response.start":
-                headers = [h for h in message.get("headers", []) if h[0].lower() not in {k for k, _ in _EXTRA_HEADERS}]
+                headers = [
+                    h
+                    for h in message.get("headers", [])
+                    if h[0].lower() not in {k for k, _ in _EXTRA_HEADERS}
+                ]
                 message = {**message, "headers": headers + _EXTRA_HEADERS}
             elif message["type"] == "http.response.body" and redact and message.get("body"):
                 # same-length mask keeps Content-Length valid for JSON and works per SSE event
-                message = {**message, "body": _CODE.sub(lambda m: m.group(1) + b"*" * len(m.group(2)) + m.group(3),
-                                                        message["body"])}
+                message = {
+                    **message,
+                    "body": _CODE.sub(
+                        lambda m: m.group(1) + b"*" * len(m.group(2)) + m.group(3), message["body"]
+                    ),
+                }
             await send(message)
 
         scope = {**scope, "headers": _with_length(scope, len(body))}
@@ -143,15 +165,29 @@ class HardenedIncidentAPI:
             return body, (403, {"detail": "approver must be the authenticated user"})
         doc["approver"] = user.user_id
         if self.audit is not None:
-            self.audit.append("api.decision", {"user": user.user_id, "roles": sorted(user.roles),
-                                               "incident": incident_id, "decision": str(doc.get("decision"))})
+            self.audit.append(
+                "api.decision",
+                {
+                    "user": user.user_id,
+                    "roles": sorted(user.roles),
+                    "incident": incident_id,
+                    "decision": str(doc.get("decision")),
+                },
+            )
         return json.dumps(doc).encode(), None
 
 
-def build_hardened_incident_app(store: UserStore, policy: Optional[dict] = None, *, db_path: Optional[str] = None,
-                                write_flag=None, monitor: Optional[SecurityMonitor] = None) -> HardenedIncidentAPI:
+def build_hardened_incident_app(
+    store: UserStore,
+    policy: Optional[dict] = None,
+    *,
+    db_path: Optional[str] = None,
+    write_flag=None,
+    monitor: Optional[SecurityMonitor] = None,
+) -> HardenedIncidentAPI:
     """Create the live incident API and wrap it. ``COPILOT_WEBHOOK_SECRET`` must be set for alerts to be accepted."""
     from incident_api.app import create_app
+
     app = create_app(db_path, on_approve=write_flag)
     return HardenedIncidentAPI(app, store, policy, monitor)
 
@@ -175,9 +211,19 @@ async def _read_body(receive, limit: int) -> tuple[bytes, bool]:
 
 async def _reply(send, status: int, doc: dict) -> None:
     raw = json.dumps(doc).encode()
-    await send({"type": "http.response.start", "status": status,
-                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(raw)).encode()),
-                            (b"x-frame-options", b"DENY"), (b"x-content-type-options", b"nosniff")] + _EXTRA_HEADERS})
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(raw)).encode()),
+                (b"x-frame-options", b"DENY"),
+                (b"x-content-type-options", b"nosniff"),
+            ]
+            + _EXTRA_HEADERS,
+        }
+    )
     await send({"type": "http.response.body", "body": raw})
 
 

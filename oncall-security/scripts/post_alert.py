@@ -7,6 +7,7 @@
 Signs the exact body bytes with the product's ``sign_webhook`` (HMAC-SHA256 + timestamp).
 Prints the HTTP status and the JSON response.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,14 +31,26 @@ def main() -> int:
     ap.add_argument("--no-sign", action="store_true")
     a = ap.parse_args()
     starts = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=6)).isoformat()
-    body = json.dumps({"version": "4", "status": a.status, "alerts": [{
-        "status": a.status, "labels": {"alertname": a.alertname, "service": a.service, "severity": "critical"},
-        "annotations": {"summary": f"{a.service} errors", "description": a.annotation}, "startsAt": starts}]}).encode()
+    body = json.dumps(
+        {
+            "version": "4",
+            "status": a.status,
+            "alerts": [
+                {
+                    "status": a.status,
+                    "labels": {"alertname": a.alertname, "service": a.service, "severity": "critical"},
+                    "annotations": {"summary": f"{a.service} errors", "description": a.annotation},
+                    "startsAt": starts,
+                }
+            ],
+        }
+    ).encode()
     headers = {"Content-Type": "application/json"}
     if a.token:
         headers["Authorization"] = f"Bearer {a.token}"
     if a.secret and not a.no_sign:
         from input_guardrails import sign_webhook
+
         ts = int(time.time())
         headers.update({"X-Signature": sign_webhook(body, a.secret.encode(), ts), "X-Timestamp": str(ts)})
     r = httpx.post(f"{a.url.rstrip('/')}/webhooks/alert", content=body, headers=headers, timeout=15)

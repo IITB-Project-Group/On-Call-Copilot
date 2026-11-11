@@ -1,12 +1,21 @@
 """Runtime protections that harden the On-Call Copilot without editing it.
 
-    from oncall_governance.protect import install_runtime_protections
-    install_runtime_protections()        # hardened injection detection everywhere the copilot screens input
-    app = build_hardened_app(store, policy)   # authenticated, role-checked API
+from oncall_governance.protect import install_runtime_protections
+install_runtime_protections()        # hardened injection detection everywhere the copilot screens input
+app = build_hardened_app(store, policy)   # authenticated, role-checked API
 """
+
 from __future__ import annotations
 
 from .detectors import HardenedInjectionDetector, hardened_input_guardrails
+
+__all__ = [
+    "HardenedInjectionDetector",
+    "hardened_input_guardrails",
+    "install_runtime_protections",
+    "uninstall_runtime_protections",
+    "protections_installed",
+]
 
 _INSTALLED = {"done": False}
 
@@ -14,6 +23,7 @@ _INSTALLED = {"done": False}
 def _has_v2() -> bool:
     try:
         import oncall_copilot.safety  # type: ignore  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -37,7 +47,8 @@ def install_runtime_protections() -> list[str]:
             mod.InputGuardrails = hardened_input_guardrails
             patched.append(mod.__name__)
     import oncall_copilot.factory as factory
-    factory._KB = None   # rebuild the knowledge base with the hardened screening
+
+    factory._KB = None  # rebuild the knowledge base with the hardened screening
     _INSTALLED["done"] = True
     return patched
 

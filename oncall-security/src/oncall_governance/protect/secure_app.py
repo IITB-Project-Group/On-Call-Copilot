@@ -11,9 +11,9 @@
   * per-identity rate limits, 64 KB request limit, security headers, no-store caching
   * audit log persisted to a JSONL file (tamper-evident chain) when ``audit_path`` is configured
 """
+
 from __future__ import annotations
 
-import json
 import os
 import threading
 import time
@@ -21,7 +21,7 @@ from collections import defaultdict, deque
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from .auth import User, UserStore, allowed
 from .detectors import hardened_input_guardrails
@@ -29,9 +29,12 @@ from .monitor import SecurityMonitor
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' "
-                               "https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'",
-    "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
-    "Cache-Control": "no-store", "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
 
 TOKEN_SHIM = """<script>
@@ -58,10 +61,12 @@ class RateLimiter:
             return True
 
 
-def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor: Optional[SecurityMonitor] = None,
-                       audit_path: Optional[str] = None) -> FastAPI:
-    from approval_service import AuditLog
-
+def build_hardened_app(
+    store: UserStore,
+    policy: Optional[dict] = None,
+    monitor: Optional[SecurityMonitor] = None,
+    audit_path: Optional[str] = None,
+) -> FastAPI:
     import oncall_copilot.api.server as srv
     from oncall_copilot.factory import alert_for
 
@@ -83,7 +88,9 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
         if int(request.headers.get("content-length") or 0) > max_body:
             mon.event("request_too_large", "medium", {"path": request.url.path})
             return JSONResponse({"detail": "request too large"}, 413, headers=SECURITY_HEADERS)
-        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip() or request.query_params.get("token")
+        tok = (request.headers.get("authorization") or "").removeprefix(
+            "Bearer "
+        ).strip() or request.query_params.get("token")
         user = store.authenticate(tok)
         request.state.user = user
         key = user.user_id if user else f"anon:{request.client.host if request.client else '?'}"
@@ -103,10 +110,14 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
         def dep(request: Request) -> User:
             u: User = request.state.user
             if u is None or not allowed(u, perm):
-                mon.event("forbidden", "medium", {"who": getattr(u, "user_id", None), "perm": perm,
-                                                  "path": request.url.path})
+                mon.event(
+                    "forbidden",
+                    "medium",
+                    {"who": getattr(u, "user_id", None), "perm": perm, "path": request.url.path},
+                )
                 raise HTTPException(403, f"requires permission '{perm}'")
             return u
+
         return dep
 
     # ---------------------------------------------------------------- pages and read endpoints
@@ -118,7 +129,10 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
     def ui():
         page = srv.UI.read_text(encoding="utf-8")
         page = page.replace("<head>", "<head>" + TOKEN_SHIM, 1)
-        return page.replace("<h1>On-Call Copilot</h1>", "<h1>On-Call Copilot <small style='font-size:12px;color:var(--steel)'>hardened</small></h1>")
+        return page.replace(
+            "<h1>On-Call Copilot</h1>",
+            "<h1>On-Call Copilot <small style='font-size:12px;color:var(--steel)'>hardened</small></h1>",
+        )
 
     @app.get("/incidents")
     def incidents(u: User = Depends(need("read"))):
@@ -146,7 +160,7 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
 
     @app.get("/roster")
     def roster(u: User = Depends(need("read"))):
-        return [{"id": u.user_id, "roles": sorted(u.roles)}]   # you are who your token says
+        return [{"id": u.user_id, "roles": sorted(u.roles)}]  # you are who your token says
 
     @app.get("/stats")
     def stats(u: User = Depends(need("read"))):
@@ -178,19 +192,27 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
             raise HTTPException(503, "webhook secret not configured: refusing unsigned alerts (fail closed)")
         raw = await request.body()
         ig = hardened_input_guardrails(webhook_secret=secret)
-        r = ig.check_alert_webhook(raw, signature=request.headers.get("X-Signature"),
-                                   timestamp=request.headers.get("X-Timestamp"))
+        r = ig.check_alert_webhook(
+            raw, signature=request.headers.get("X-Signature"), timestamp=request.headers.get("X-Timestamp")
+        )
         if r.blocked:
             mon.event("alert_rejected", "high", {"codes": sorted(r.codes)})
             raise HTTPException(422, {"codes": sorted(r.codes)})
         started = []
         for a in r.sanitized["alerts"]:
             if a["status"] == "firing":
-                sig = "p95_ms" if "Latency" in a["alertname"] else "consumer_lag" if "Lag" in a["alertname"] else "error_rate"
+                sig = (
+                    "p95_ms"
+                    if "Latency" in a["alertname"]
+                    else "consumer_lag"
+                    if "Lag" in a["alertname"]
+                    else "error_rate"
+                )
                 started.append(srv._start(alert_for(a["service"], sig)))
         return {"incidents": started}
 
-    if api.get("allow_demo", False):   # never in production
+    if api.get("allow_demo", False):  # never in production
+
         @app.post("/demo/{scenario}")
         def demo(scenario: str, u: User = Depends(need("start_incident"))):
             return srv.demo(scenario, None)
@@ -216,9 +238,17 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
         mon.approval_decided(u.user_id, req, r.decision.value)
         if req.status.value != "pending":
             srv.ENGINEER.done(rid)
-        srv._emit(srv.REQ_TO_INC.get(rid, "?"), "approval_decided", {"request_id": rid, "by": u.user_id,
-                                                                     "decision": r.decision.value, "codes": sorted(r.codes)})
-        return {"decision": r.decision.value, "codes": sorted(r.codes), "status": req.status.value, "approver": u.user_id}
+        srv._emit(
+            srv.REQ_TO_INC.get(rid, "?"),
+            "approval_decided",
+            {"request_id": rid, "by": u.user_id, "decision": r.decision.value, "codes": sorted(r.codes)},
+        )
+        return {
+            "decision": r.decision.value,
+            "codes": sorted(r.codes),
+            "status": req.status.value,
+            "approver": u.user_id,
+        }
 
     @app.post("/approvals/{rid}/reject")
     async def reject(rid: str, request: Request, u: User = Depends(need("reject"))):
@@ -242,7 +272,11 @@ def build_hardened_app(store: UserStore, policy: Optional[dict] = None, monitor:
 
     @app.post("/control/pause")
     async def pause(request: Request, u: User = Depends(need("pause"))):
-        return {"paused": srv.APPROVALS.pause(u.user_id, str((await request.json()).get("reason", "change freeze")))}
+        return {
+            "paused": srv.APPROVALS.pause(
+                u.user_id, str((await request.json()).get("reason", "change freeze"))
+            )
+        }
 
     @app.post("/control/resume")
     async def resume(request: Request, u: User = Depends(need("pause"))):
