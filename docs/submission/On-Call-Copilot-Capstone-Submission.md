@@ -476,7 +476,7 @@ Roles were named early and we append dated entries. Two separations we stuck to:
 Deck: [On-Call-Copilot-Slides.pptx](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/submission/On-Call-Copilot-Slides.pptx)  
 Slide list: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/SLIDES.md
 
-Eleven slides: title, problem & user, architecture, C2 graph, diagnosis-as-planning, safe action, memory, security, evaluation, demo & links, limits & next.
+Eleven slides: title, problem & user, architecture, C2 graph, diagnosis as planning, safe action, memory, security, evaluation, demo & links, limits & next.
 
 ---
 
