@@ -8,7 +8,7 @@
 | Config | `agents/config/agents.yaml`, version `2026-11-07.1` |
 | Plan | [../agents-and-orchestration-plan.md](../agents-and-orchestration-plan.md) |
 
-This document explains how the incident graph, the commander and the specialists work, how to run them, and where each piece of role 3's evidence is. Evaluation status is in [evaluation.md](evaluation.md), the lesson policy in [playbook.md](playbook.md), runs in [experiment-log.md](experiment-log.md), and viva preparation in [viva.md](viva.md).
+This document explains how the incident graph, the commander and the specialists work, how to run them, and where each piece of role 3's evidence is. Evaluation status is in [evaluation.md](evaluation.md), the lesson policy in [playbook.md](playbook.md), runs in [experiment-log.md](experiment-log.md), viva notes in [viva.md](viva.md), and the full viva drill in [../VIVA_DRILL.md](../VIVA_DRILL.md).
 
 **What has and has not been run.**
 
@@ -19,8 +19,10 @@ This document explains how the incident graph, the commander and the specialists
 
 ## 1. Architecture
 
+Submission figures (system + C2 graph) and the numbered paymentFailure walkthrough: **[../ARCHITECTURE.md](../ARCHITECTURE.md)**.
+
 ```mermaid
-graph TD
+flowchart TD
   A[Alertmanager webhook] --> I[intake]
   I --> P[plan: commander, stronger model]
   P --> T[triage: ReAct, read-only]
@@ -47,7 +49,7 @@ graph TD
   AS -->|out of replans| E[escalate] --> C
 ```
 
-The exact compiled graphs, exported by LangGraph:
+Compiled LangGraph exports (mechanism reference, not the submission redraw):
 
 - [graph-c2.mmd](graph-c2.mmd): the team.
 - [graph-c1.mmd](graph-c1.mmd): the single agent.

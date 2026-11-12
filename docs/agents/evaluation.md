@@ -12,7 +12,7 @@ This is role 3's input to the evaluation report. It says what is measured, how, 
 
 - **Cases.**
   - 20 development cases are in `eval/cases/dev`: F1, F3, F9 and F10 with 4 variants each, two noise cases, and two two-fault cases.
-  - They follow role 1's split (docs/domain-and-product.md, section 9).
+  - They follow role 1's development / held-out split (`eval/cases/dev`; held-out stays outside the tuner’s path). Fault labels follow `agents/catalog.py`.
   - Role 3 drafted them from role 1's catalogue, and role 1 confirms them.
   - Held-out cases (40) are written and kept by role 5 outside this repository. The runner refuses `--split heldout` without `--cases-dir`, and refuses a playbook unless it is frozen and unchanged (`eval.playbook check`).
 - **Configs.** Every experiment is a file in `eval/experiments/`, not a code branch. Each row records:

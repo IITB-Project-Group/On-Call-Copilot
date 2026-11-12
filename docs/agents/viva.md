@@ -2,7 +2,11 @@
 
 Short answers to the questions the guide says every member must handle, for role 3's part.
 
+**Full drill (timed plan, L4–L16 cards, hostile Q bank, demo cues):** [../VIVA_DRILL.md](../VIVA_DRILL.md).
+
 **Redraw the architecture.**
+
+Use [../ARCHITECTURE.md](../ARCHITECTURE.md) (Figure 1 system, Figure 2 graph). Short form:
 
 - Alert → incident API → graph thread.
 - intake → plan (commander) → triage → parallel diagnosis (`Send`) → assess.

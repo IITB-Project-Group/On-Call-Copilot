@@ -1,6 +1,6 @@
 """Shop facts the agents and the fixed baseline share: which flag injects which fault, where.
 
-These are domain facts from the fault catalogue (docs/domain-and-product.md, section 8), not
+These are domain facts from the in-repo fault catalogue (flags, services, fault types), not
 answers to any case. The fixed workflow (C0) uses them as its rules; the model-driven
 specialists see the flag list in their prompt and must still find the evidence.
 """
