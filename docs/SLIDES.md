@@ -17,7 +17,7 @@ Supporting detail: [ARCHITECTURE.md](ARCHITECTURE.md) · [agents/evaluation.md](
 6. **Safe action** — no shell · allow-listed writes · exact-command approval · verify/rollback  
 7. **Memory & playbook** — preconditions · freeze · pm-006 rejected on payment incident  
 8. **Security** — T1–T10 · log injection blocked · oncall-security reports  
-9. **Evaluation** — twin E1/E4 numbers · harmful executed = 0 · held-out still open  
+9. **Evaluation** — twin E1/E4 numbers · harmful executed = 0 · [EVAL_IMPLEMENTATION_REPORT.md](EVAL_IMPLEMENTATION_REPORT.md)  
 10. **Demo & links** — video + doc map + portal PDF  
 11. **Limits & next** — Reflexion freeze · held-out ×3 · equal-model ablation  
 
