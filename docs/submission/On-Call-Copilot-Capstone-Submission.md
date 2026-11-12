@@ -158,9 +158,9 @@ What we store, when a lesson can influence ranking, who is allowed to write, and
 | Kind | Content | Location |
 | --- | --- | --- |
 | Incident record | Service, symptom, root cause, fix, verification outcome | Incident store / postmortem path |
-| Seed lessons | Structured lessons from past postmortems | [`knowledge/playbook/seed-lessons.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/seed-lessons.yaml) (pm-001…pm-008) |
-| Reflexion playbook | Lessons from failed **development** runs after human review | [`knowledge/playbook/playbook.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/playbook.yaml) (frozen before held-out) |
-| Rejected drafts | Lesson text + rejection reason | [`knowledge/playbook/rejected.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/rejected.yaml) |
+| Seed lessons | Structured lessons from past postmortems | [`knowledge/playbook/seed-lessons.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/seed-lessons.yaml) (pm-001…pm-008) |
+| Reflexion playbook | Lessons from failed development runs after human review | [`knowledge/playbook/playbook.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/playbook.yaml) (frozen before held-out) |
+| Rejected drafts | Lesson text + rejection reason | `knowledge/playbook/rejected.yaml` (written by `eval.playbook review`) |
 
 A lesson is at least: `{id, service, fault_type, lesson, preconditions, reviewed_by, created_at}`.
 
@@ -191,9 +191,9 @@ Reflexion drafts (dev only) need at least two preconditions, one of them discrim
 
 | Control | Rule |
 | --- | --- |
-| Freeze | Before held-out runs, `eval.playbook freeze` writes [`playbook.lock.json`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/playbook.lock.json). Later writes are refused; a modified frozen file fails the hash check on load |
+| Freeze | Before held-out runs, `eval.playbook freeze` writes `knowledge/playbook/playbook.lock.json`. Later writes are refused; a modified frozen file fails the hash check on load |
 | Retention | Lessons older than 365 days stop applying and must be re-reviewed |
-| Correction / delete | Rejected lessons keep a reason in [`rejected.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/rejected.yaml). Approved lessons are corrected by a new reviewed write after unfreeze (never silent edit of a frozen file) |
+| Correction / delete | Rejected lessons keep a reason in `knowledge/playbook/rejected.yaml`. Approved lessons are corrected by a new reviewed write after unfreeze (never silent edit of a frozen file) |
 | Who can read | On-call graph roles that need context (runbook / diagnosis prompts); evaluation harness. No cross-tenant personal data is stored |
 
 ## 6. Tie-in to evaluation

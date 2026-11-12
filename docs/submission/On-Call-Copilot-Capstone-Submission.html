@@ -707,22 +707,21 @@ write, and how we correct mistakes.</p>
 <td>Seed lessons</td>
 <td>Structured lessons from past postmortems</td>
 <td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/seed-lessons.yaml"><code>knowledge/playbook/seed-lessons.yaml</code></a>
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/seed-lessons.yaml"><code>knowledge/playbook/seed-lessons.yaml</code></a>
 (pm-001…pm-008)</td>
 </tr>
 <tr>
 <td>Reflexion playbook</td>
-<td>Lessons from failed <strong>development</strong> runs after human
-review</td>
+<td>Lessons from failed development runs after human review</td>
 <td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/playbook.yaml"><code>knowledge/playbook/playbook.yaml</code></a>
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/playbook.yaml"><code>knowledge/playbook/playbook.yaml</code></a>
 (frozen before held-out)</td>
 </tr>
 <tr>
 <td>Rejected drafts</td>
 <td>Lesson text + rejection reason</td>
-<td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/rejected.yaml"><code>knowledge/playbook/rejected.yaml</code></a></td>
+<td><code>knowledge/playbook/rejected.yaml</code> (written by
+<code>eval.playbook review</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -778,10 +777,9 @@ correction</h2>
 <tbody>
 <tr>
 <td>Freeze</td>
-<td>Before held-out runs, <code>eval.playbook freeze</code> writes <a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/playbook.lock.json"><code>playbook.lock.json</code></a>.
-Later writes are refused; a modified frozen file fails the hash check on
-load</td>
+<td>Before held-out runs, <code>eval.playbook freeze</code> writes
+<code>knowledge/playbook/playbook.lock.json</code>. Later writes are
+refused; a modified frozen file fails the hash check on load</td>
 </tr>
 <tr>
 <td>Retention</td>
@@ -790,10 +788,10 @@ re-reviewed</td>
 </tr>
 <tr>
 <td>Correction / delete</td>
-<td>Rejected lessons keep a reason in <a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/rejected.yaml"><code>rejected.yaml</code></a>.
-Approved lessons are corrected by a new reviewed write after unfreeze
-(never silent edit of a frozen file)</td>
+<td>Rejected lessons keep a reason in
+<code>knowledge/playbook/rejected.yaml</code>. Approved lessons are
+corrected by a new reviewed write after unfreeze (never silent edit of a
+frozen file)</td>
 </tr>
 <tr>
 <td>Who can read</td>
