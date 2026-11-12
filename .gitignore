@@ -5,6 +5,8 @@ __pycache__/
 .coverage.*
 htmlcov/
 *.pdf
+!docs/submission/*.pdf
+!docs/submission/*.pptx
 opentelemetry-demo/
 deploy/openrouter-secret.yaml
 
