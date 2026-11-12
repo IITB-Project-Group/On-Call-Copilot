@@ -24,7 +24,7 @@ subtitle: "Agentic AI Capstone"
 | Architecture and numbered walkthrough | §2 · [docs/ARCHITECTURE.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/ARCHITECTURE.md) |
 | Threat model | §3 · [docs/THREAT_MODEL.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/THREAT_MODEL.md) |
 | Memory policy | §4 · [docs/MEMORY_POLICY.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/MEMORY_POLICY.md) |
-| Evaluation report | §5 · [docs/EVALUATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md) · [docs/agents/evaluation.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md) |
+| Evaluation report | §5 · [docs/EVALUATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md) · [docs/EVAL_IMPLEMENTATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md) · [docs/agents/evaluation.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md) |
 | Experiment log | §6 · [docs/agents/experiment-log.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md) |
 | Contribution log | §7 · [docs/CONTRIBUTION_LOG.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/CONTRIBUTION_LOG.md) |
 | Slides | §8 · [On-Call-Copilot-Slides.pptx](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/submission/On-Call-Copilot-Slides.pptx) (11 slides) |
@@ -158,9 +158,9 @@ What we store, when a lesson can influence ranking, who is allowed to write, and
 | Kind | Content | Location |
 | --- | --- | --- |
 | Incident record | Service, symptom, root cause, fix, verification outcome | Incident store / postmortem path |
-| Seed lessons | Structured lessons from past postmortems | [`knowledge/playbook/seed-lessons.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/seed-lessons.yaml) (pm-001…pm-008) |
-| Reflexion playbook | Lessons from failed **development** runs after human review | [`knowledge/playbook/playbook.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/playbook.yaml) (frozen before held-out) |
-| Rejected drafts | Lesson text + rejection reason | [`knowledge/playbook/rejected.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/rejected.yaml) |
+| Seed lessons | Structured lessons from past postmortems | [`knowledge/playbook/seed-lessons.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/seed-lessons.yaml) (pm-001…pm-008) |
+| Reflexion playbook | Lessons from failed development runs after human review | [`knowledge/playbook/playbook.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/playbook.yaml) (frozen before held-out) |
+| Rejected drafts | Lesson text + rejection reason | `knowledge/playbook/rejected.yaml` (written by `eval.playbook review`) |
 
 A lesson is at least: `{id, service, fault_type, lesson, preconditions, reviewed_by, created_at}`.
 
@@ -191,9 +191,9 @@ Reflexion drafts (dev only) need at least two preconditions, one of them discrim
 
 | Control | Rule |
 | --- | --- |
-| Freeze | Before held-out runs, `eval.playbook freeze` writes [`playbook.lock.json`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/playbook.lock.json). Later writes are refused; a modified frozen file fails the hash check on load |
+| Freeze | Before held-out runs, `eval.playbook freeze` writes `knowledge/playbook/playbook.lock.json`. Later writes are refused; a modified frozen file fails the hash check on load |
 | Retention | Lessons older than 365 days stop applying and must be re-reviewed |
-| Correction / delete | Rejected lessons keep a reason in [`rejected.yaml`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/rejected.yaml). Approved lessons are corrected by a new reviewed write after unfreeze (never silent edit of a frozen file) |
+| Correction / delete | Rejected lessons keep a reason in `knowledge/playbook/rejected.yaml`. Approved lessons are corrected by a new reviewed write after unfreeze (never silent edit of a frozen file) |
 | Who can read | On-call graph roles that need context (runbook / diagnosis prompts); evaluation harness. No cross-tenant personal data is stored |
 
 ## 6. Tie-in to evaluation
@@ -207,8 +207,16 @@ E3 is held-out before vs after the frozen Reflexion playbook (role 5).
 
 # 5. Evaluation report
 
-Short report: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md  
-Method and full twin tables: [agents/evaluation.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md) · dated log: [experiment-log.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md) · raw files: `eval/results/`.
+Short summary: [docs/EVALUATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md)  
+
+
+**Role 5 implementation report** (what `eval/` does, scoring, reliability, recomputed twin tables, dataset/held-out notes, Reflexion status):  
+[docs/EVAL_IMPLEMENTATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md)  
+
+
+Role 3 method notes: [agents/evaluation.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md) · dated log: [experiment-log.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md) · raw files: `eval/results/`.
+
+Manam’s report (checked at commit `2705d05`) recomputes E1/E4 from the result files, documents the 50/30/20 dataset, pass@k / pass^k on held-out twin rows copied from `eval/dataset/README.md`, and is explicit about what is still open (live shop held-out, E3 freeze, unused judge). The summary tables below match that batch; prefer the implementation report when a number needs a file path.
 
 ## 1. Setup
 
@@ -464,6 +472,7 @@ Roles were named early and we append dated entries. Two separations we stuck to:
 | 2026-11-11 | 1 / 3 | Redrawn architecture figures + numbered walkthrough | PR [#18](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/18) · [`docs/ARCHITECTURE.md`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/ARCHITECTURE.md) |
 | 2026-11-11 | 4 / 5 | `oncall-security`: red-team, governance controls, reports, CI gate | PR [#19](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/19) |
 | 2026-11-12 | 1 / 6 | Backup demo recording | PR [#20](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/20) · [`Demo/video1909353936.mp4`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/Demo/video1909353936.mp4) |
+| 2026-11-12 | 5 | Evaluation implementation report (scoring, twin tables, dataset, reliability) | [`docs/EVAL_IMPLEMENTATION_REPORT.md`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md) |
 | ongoing | 3 / 5 | Twin E1/E3/E4 runs, experiment log, Reflexion drafts ready for human review | [`docs/agents/evaluation.md`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md), [`docs/agents/experiment-log.md`](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md), `eval/` |
 
 
@@ -535,7 +544,8 @@ Seed lesson pm-006 says high ad latency comes from `adHighCpu` when ad CPU is sa
 - Architecture: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/ARCHITECTURE.md  
 - Threat model: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/THREAT_MODEL.md  
 - Memory policy: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/MEMORY_POLICY.md  
-- Evaluation: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md  
+- Evaluation summary: [docs/EVALUATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md)  
+- Evaluation implementation (Role 5): [docs/EVAL_IMPLEMENTATION_REPORT.md](https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md)  
 - Experiment log: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md  
 - Contribution log: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/CONTRIBUTION_LOG.md  
 - Slides: https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/submission/On-Call-Copilot-Slides.pptx  

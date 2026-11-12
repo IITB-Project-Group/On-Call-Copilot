@@ -287,6 +287,8 @@ href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/MEMOR
 <td>§5 · <a
 href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md">docs/EVALUATION_REPORT.md</a>
 · <a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md">docs/EVAL_IMPLEMENTATION_REPORT.md</a>
+· <a
 href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md">docs/agents/evaluation.md</a></td>
 </tr>
 <tr>
@@ -707,22 +709,21 @@ write, and how we correct mistakes.</p>
 <td>Seed lessons</td>
 <td>Structured lessons from past postmortems</td>
 <td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/seed-lessons.yaml"><code>knowledge/playbook/seed-lessons.yaml</code></a>
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/seed-lessons.yaml"><code>knowledge/playbook/seed-lessons.yaml</code></a>
 (pm-001…pm-008)</td>
 </tr>
 <tr>
 <td>Reflexion playbook</td>
-<td>Lessons from failed <strong>development</strong> runs after human
-review</td>
+<td>Lessons from failed development runs after human review</td>
 <td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/playbook.yaml"><code>knowledge/playbook/playbook.yaml</code></a>
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/knowledge/playbook/playbook.yaml"><code>knowledge/playbook/playbook.yaml</code></a>
 (frozen before held-out)</td>
 </tr>
 <tr>
 <td>Rejected drafts</td>
 <td>Lesson text + rejection reason</td>
-<td><a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/knowledge/playbook/rejected.yaml"><code>knowledge/playbook/rejected.yaml</code></a></td>
+<td><code>knowledge/playbook/rejected.yaml</code> (written by
+<code>eval.playbook review</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -778,10 +779,9 @@ correction</h2>
 <tbody>
 <tr>
 <td>Freeze</td>
-<td>Before held-out runs, <code>eval.playbook freeze</code> writes <a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/playbook.lock.json"><code>playbook.lock.json</code></a>.
-Later writes are refused; a modified frozen file fails the hash check on
-load</td>
+<td>Before held-out runs, <code>eval.playbook freeze</code> writes
+<code>knowledge/playbook/playbook.lock.json</code>. Later writes are
+refused; a modified frozen file fails the hash check on load</td>
 </tr>
 <tr>
 <td>Retention</td>
@@ -790,10 +790,10 @@ re-reviewed</td>
 </tr>
 <tr>
 <td>Correction / delete</td>
-<td>Rejected lessons keep a reason in <a
-href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/rejected.yaml"><code>rejected.yaml</code></a>.
-Approved lessons are corrected by a new reviewed write after unfreeze
-(never silent edit of a frozen file)</td>
+<td>Rejected lessons keep a reason in
+<code>knowledge/playbook/rejected.yaml</code>. Approved lessons are
+corrected by a new reviewed write after unfreeze (never silent edit of a
+frozen file)</td>
 </tr>
 <tr>
 <td>Who can read</td>
@@ -810,13 +810,25 @@ E3 is held-out before vs after the frozen Reflexion playbook (role
 5).</p>
 <hr />
 <h1 id="evaluation-report">5. Evaluation report</h1>
-<p>Short report:
-https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md<br />
-Method and full twin tables: <a
+<p>Short summary: <a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md">docs/EVALUATION_REPORT.md</a></p>
+<p><strong>Role 5 implementation report</strong> (what
+<code>eval/</code> does, scoring, reliability, recomputed twin tables,
+dataset/held-out notes, Reflexion status):<br />
+<a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md">docs/EVAL_IMPLEMENTATION_REPORT.md</a></p>
+<p>Role 3 method notes: <a
 href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/evaluation.md">agents/evaluation.md</a>
 · dated log: <a
 href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md">experiment-log.md</a>
 · raw files: <code>eval/results/</code>.</p>
+<p>Manam’s report (checked at commit <code>2705d05</code>) recomputes
+E1/E4 from the result files, documents the 50/30/20 dataset, pass@k /
+pass^k on held-out twin rows copied from
+<code>eval/dataset/README.md</code>, and is explicit about what is still
+open (live shop held-out, E3 freeze, unused judge). The summary tables
+below match that batch; prefer the implementation report when a number
+needs a file path.</p>
 <h2 id="setup">1. Setup</h2>
 <table>
 <colgroup>
@@ -1838,6 +1850,14 @@ href="https://github.com/IITB-Project-Group/On-Call-Copilot/pull/20">#20</a>
 href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/Demo/video1909353936.mp4"><code>Demo/video1909353936.mp4</code></a></td>
 </tr>
 <tr>
+<td>2026-11-12</td>
+<td>5</td>
+<td>Evaluation implementation report (scoring, twin tables, dataset,
+reliability)</td>
+<td><a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md"><code>docs/EVAL_IMPLEMENTATION_REPORT.md</code></a></td>
+</tr>
+<tr>
 <td>ongoing</td>
 <td>3 / 5</td>
 <td>Twin E1/E3/E4 runs, experiment log, Reflexion drafts ready for human
@@ -1958,8 +1978,11 @@ https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/THREAT_MODE
 <li>Memory policy:
 https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/MEMORY_POLICY.md<br />
 </li>
-<li>Evaluation:
-https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md<br />
+<li>Evaluation summary: <a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVALUATION_REPORT.md">docs/EVALUATION_REPORT.md</a><br />
+</li>
+<li>Evaluation implementation (Role 5): <a
+href="https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/EVAL_IMPLEMENTATION_REPORT.md">docs/EVAL_IMPLEMENTATION_REPORT.md</a><br />
 </li>
 <li>Experiment log:
 https://github.com/IITB-Project-Group/On-Call-Copilot/blob/main/docs/agents/experiment-log.md<br />

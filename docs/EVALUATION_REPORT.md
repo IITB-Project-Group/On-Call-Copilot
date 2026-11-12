@@ -1,6 +1,7 @@
 # Evaluation report — On-Call Copilot
 
-**Full method notes:** [agents/evaluation.md](agents/evaluation.md) · **Experiment log:** [agents/experiment-log.md](agents/experiment-log.md) · **Results:** `eval/results/`.
+**Implementation + recomputed tables (Role 5):** [EVAL_IMPLEMENTATION_REPORT.md](EVAL_IMPLEMENTATION_REPORT.md)  
+**Role 3 method notes:** [agents/evaluation.md](agents/evaluation.md) · **Experiment log:** [agents/experiment-log.md](agents/experiment-log.md) · **Results:** `eval/results/`.
 
 ## 1. Setup
 

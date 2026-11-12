@@ -30,5 +30,6 @@ Assign a name to each role on day 1 and append dated entries. Two separations ke
 | 2026-11-11 | 1 / 3 | Redrawn architecture figures + numbered walkthrough | PR [#18](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/18) · `docs/ARCHITECTURE.md` |
 | 2026-11-11 | 4 / 5 | `oncall-security`: red-team, governance controls, reports, CI gate | PR [#19](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/19) |
 | 2026-11-12 | 1 / 6 | Backup demo recording | PR [#20](https://github.com/IITB-Project-Group/On-Call-Copilot/pull/20) · `Demo/video1909353936.mp4` |
+| 2026-11-12 | 5 | Evaluation implementation report (scoring, twin tables, dataset, reliability) | `docs/EVAL_IMPLEMENTATION_REPORT.md` |
 | ongoing | 3 / 5 | Twin E1/E3/E4 runs, experiment log, Reflexion drafts awaiting human review | `docs/agents/evaluation.md`, `docs/agents/experiment-log.md`, `eval/` |
 
