@@ -25,7 +25,7 @@ Its flag service (`flagd`) injects failures through feature flags:
 | `emailMemoryLeak` | Email service memory leak |
 | `imageSlowLoad` | Slow image loads |
 
-If a laptop cannot run the demo, the fallback is a four-service FastAPI shop with faults injected through [Toxiproxy](https://github.com/shopify/toxiproxy).
+Offline evaluation, when the shop is not running, uses the shop twin in `eval/scenario.py`. It answers the same read tools from an injected fault.
 
 ## Run the shop
 
@@ -71,7 +71,11 @@ On Rancher Desktop, the `docker` CLI often points at rootless Podman and reports
 | Telemetry MCP | http://127.0.0.1:8012/mcp |
 | Runbooks MCP | http://127.0.0.1:8013/mcp |
 
-`up.sh` starts the incident API, and it starts the telemetry and runbook MCP servers so an orchestrator can call the shop tools. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time over five minutes and that stays true for one minute. Alertmanager posts each firing service to the API. The console lists open incidents and keeps approved and rejected ones on Closed. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
+`up.sh` starts the incident API, and it starts the telemetry and runbook MCP servers so an orchestrator can call the shop tools. Prometheus raises `ServiceErrorRateHigh` when any operation on a service fails more than 5% of the time over five minutes and that stays true for one minute. Alertmanager posts each firing service to the API. The console lists open incidents on Open. An incident with a stored approve or reject is listed on Closed.
+
+With an OpenRouter key the API runs the C2 graph. Approving a command keeps the incident open while the agent runs it and checks recovery. The row moves to Closed when recovery is verified. A SEV1 command needs two different approvers. An edit cancels the pending approval and asks for a new proposal. Rejecting a command leaves the shop unchanged and sends the graph back to replan, until it is out of replans and escalates. If the graph has finished and the row is still open, Approve or Reject on the console closes it.
+
+Without a key the API uses the fixed workflow. Approve closes the incident. For checkout or payment it also sets `paymentFailure` to `off`. An edit keeps the incident open and clears an earlier approval. Reject closes it and leaves the shop unchanged.
 
 To fire the rule, set `paymentFailure` to `100%`, or turn on another flag that makes a service return errors, such as `aiRunawayAgent`. Leave the load generator running. Prometheus scrapes once a minute, so the rule reads the last five minutes and then waits one minute. One incident per service shows on the console after that. Refresh the console if it was already open; the list loads when the page opens.
 
@@ -112,22 +116,24 @@ The redrawn submission figures (system architecture + C2 graph) and the full num
 | Human control | Approval of the exact command and of external status updates. Hooks limit each agent's tools and call budget, and they stop loops. |
 | Security | Log injection, a poisoned runbook step, and a third-party tool with a poisoned description. Secrets are redacted before any model sees a log. |
 | Evaluation | About 12 fault types with 4–5 variants each (intensity, timing, load), plus noisy alerts with no fault and cases with two faults at once. About 60 incidents. The injected fault is the ground truth. |
-| Operations | Shop Grafana, plus panels for time to diagnose, time to recover, tool calls per incident, actions rolled back, and cost. Alerts on the agent itself, for example repeated rollbacks or a loop. CI runs an eval gate with Docker Compose. |
+| Operations | Shop Grafana, plus panels for time to diagnose, time to recover, tool calls per incident, actions rolled back, and cost. Alerts on the agent itself, for example repeated rollbacks or a loop. CI lints with Ruff, runs pytest, builds the incident API image, and runs the guardrail security gate. |
 
-### Planned repository layout
+### Repository layout
 
 ```text
-up.sh          Kind cluster, Astronomy Shop, and the incident API
-deploy/        Shop Helm values and the incident API manifest
-schemas/       Alert, incident state, tool result, action proposal, eval case
-incident_api/  Process that serves the webhook, stream, decisions, and page
-api/           Alert webhook parsing and the investigation stream
-ui/            Live investigation and approval page
-knowledge/     Runbooks, seed postmortems, ingestion
-tools/         Telemetry, runbook search, tickets, ops actions
-graph/         Incident commander and incident state
-agents/        Triage, diagnosis, runbook, comms, remediation, memory
-eval/          Fault suite, scorer, ablations, CI gate
+up.sh             Kind cluster, Astronomy Shop, and the incident API
+deploy/           Shop Helm values and the incident API manifest
+schemas/          Alert, incident state, tool result, action proposal, eval case
+incident_api/     Process that serves the webhook, stream, decisions, and page
+api/              Alert webhook parsing and the investigation stream
+ui/               Live investigation and approval page
+knowledge/        Runbooks, seed postmortems, ingestion
+tools/            Telemetry, runbook search, tickets, ops actions
+graph/            Incident commander and incident state
+agents/           Triage, diagnosis, runbook, comms, remediation, memory
+eval/             Fault suite, shop twin, scorer, recorded runs
+safety/           Hooks, input and output guardrails, approval gate
+oncall-security/  Red-team runner and governance checks
 ```
 
 `schemas/` is the shared module. It changes only by review. Agents call tools through those types. Diagnosis agents receive no write tools.
@@ -189,15 +195,23 @@ First integrated milestone: `paymentFailure` only, from alert to approved flag c
 
 ## Status
 
-The Astronomy Shop and the incident alert path run from `up.sh` on a local kind cluster. The sections above are the build contract taken from the capstone architecture guide.
+The Astronomy Shop and the incident alert path run from `up.sh` on a local kind cluster. What we build, Evaluation, Demo, Work split, Guardrails, and Stretch are the capstone build contract. Run the shop, the repository layout, and this section describe the tree on `main`.
 
-**Agents and orchestration** (role 3) are in `agents/` and `graph/`:
+**Agents and orchestration** are in `agents/` and `graph/`:
 
 - a LangGraph incident graph with a commander, triage, parallel diagnosis, runbook, remediation and comms specialists;
 - approvals through `interrupt()`;
 - verification with rollback and replan;
 - a SQLite checkpointer;
 - the C0 and C1 baselines;
-- Reflexion with lesson review and freezing.
+- Reflexion drafts in `eval/reflexion/`. A person still reviews those drafts and freezes the playbook before a held-out run.
 
-`./up.sh` starts the graph in the incident API (`COPILOT_AGENT=c2`). Model ids come from `deploy/copilot-models.yaml`. The API falls back to the fixed workflow when secret `openrouter` is absent. The offline evaluation is `python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --out eval/results/twin/c0.jsonl`. See [docs/agents/README.md](docs/agents/README.md).
+`./up.sh` starts the graph in the incident API (`COPILOT_AGENT=c2`). Model ids come from `deploy/copilot-models.yaml`. The API falls back to the fixed workflow when secret `openrouter` is absent.
+
+Recorded twin runs and how the scorer works are in [docs/EVAL_IMPLEMENTATION_REPORT.md](docs/EVAL_IMPLEMENTATION_REPORT.md). The checked-in C0 run is `eval/results/twin/e1-c0-fixed.jsonl`. Reproduce it with:
+
+```shell
+python -m eval.runner --experiment eval/experiments/e1-c0-fixed.yaml --split dev --out eval/results/twin/e1-c0-fixed.jsonl
+```
+
+Graph internals are in [docs/agents/README.md](docs/agents/README.md). The submission pack is [docs/submission/On-Call-Copilot-Capstone-Submission.md](docs/submission/On-Call-Copilot-Capstone-Submission.md). Guardrail and red-team checks live in `safety/` and `oncall-security/`. CI runs the guardrail suites from `.github/workflows/security-gate.yml` and lint, tests, and the image build from `.github/workflows/ci.yml`. Held-out runs on the live shop are still open.
